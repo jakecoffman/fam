@@ -3,18 +3,22 @@ package fam
 import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/cp/examples"
 )
 
 type Game struct {
 	state         int
 	Keys          [1024]bool
-	Width, Height int
+	Width, Height float64
 	vsync         int
 
-	Ball   *Ball
+	Space *cp.Space
+
+	Ball *Ball
 
 	// used for slerp
-	LastBallPosition   mgl32.Vec2
+	LastBallPosition cp.Vector
 
 	*ResourceManager
 	ParticleGenerator *ParticleGenerator
@@ -31,16 +35,33 @@ const (
 
 var (
 	playerSize          = mgl32.Vec2{100, 20}
-	playerVelocity      = float32(250.0)
+	playerVelocity      = 11250.0
 	initialBallVelocity = Vec2(0, 0)
-	ballRadius          = float32(25)
+	ballRadius          = 25.0
 )
 
 func (g *Game) New(w, h int, window *glfw.Window) {
 	g.vsync = 1
-	g.Width = w
-	g.Height = h
+	g.Width = float64(w)
+	g.Height = float64(h)
 	g.Keys = [1024]bool{}
+	g.Space = cp.NewSpace()
+	g.Space.SetGravity(cp.Vector{0, 0})
+	sides := []cp.Vector{
+		{0, 0}, {g.Width, 0},
+		{g.Width, 0}, {g.Width, g.Height},
+		{g.Width, g.Height}, {0, g.Height},
+		{0, g.Height}, {0, 0},
+	}
+
+	for i := 0; i < len(sides); i += 2 {
+		var seg *cp.Shape
+		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], 10))
+		seg.SetElasticity(1)
+		seg.SetFriction(1)
+		seg.SetFilter(examples.NotGrabbableFilter)
+	}
+
 	g.ResourceManager = NewResourceManager()
 
 	width, height := float32(g.Width), float32(g.Height)
@@ -60,6 +81,7 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	g.LoadTexture("textures/paddle.png", "paddle")
 	g.LoadTexture("textures/particle.png", "particle")
 	g.LoadTexture("textures/awesomeface.png", "face")
+	g.LoadTexture("textures/banana.png", "banana")
 
 	shader := g.LoadShader("shaders/text.vs.glsl", "shaders/text.fs.glsl", "text")
 	g.TextRenderer = NewTextRenderer(shader, width, height, "textures/Roboto-Light.ttf", 24)
@@ -68,8 +90,11 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	g.ParticleGenerator = NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
 
-	playerPos := mgl32.Vec2{float32(g.Width)/2.0 - playerSize.X()/2.0, float32(g.Height) - playerSize.Y()}
-	g.Ball = NewBall(playerPos, ballRadius, initialBallVelocity, g.Texture("face"))
+	//playerPos := cp.Vector{g.Width/2.0, g.Height/2}
+	g.Ball = NewBall(cp.Vector{100, 100}, ballRadius, g.Texture("face"))
+	g.Space.AddBody(g.Ball.Body)
+	g.Space.AddShape(g.Ball.Shape)
+	//g.Ball.Body = cp.NewBody(1, cp.MomentForCircle(1, ballRadius, ballRadius, cp.Vector{0, 0}))
 
 	g.state = stateActive
 
@@ -96,21 +121,20 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	})
 }
 
-func (g *Game) Update(dt float32) {
-	g.LastBallPosition = g.Ball.Position
-
+func (g *Game) Update(dt float64) {
+	g.LastBallPosition = g.Ball.Position()
 	g.processInput(dt)
-	g.Ball.Move(dt, float32(g.Width), float32(g.Height))
-	ball := g.Ball.Object
-	g.ParticleGenerator.Update(dt, ball.Position, ball.Velocity, 2, mgl32.Vec2{g.Ball.Radius / 2, g.Ball.Radius / 2})
+	g.Space.Step(dt)
+	//ball := g.Ball
+	//g.ParticleGenerator.Update(dt, ball.Position(), ball.Velocity(), 2, mgl32.Vec2{g.Ball.Radius() / 2, g.Ball.Radius() / 2})
 }
 
-func (g *Game) Render(alpha float32) {
-	if g.state == stateActive {
-		g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), Vec2(g.Width, g.Height), 0, DefaultColor)
-		g.ParticleGenerator.Draw()
-		g.Ball.Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
-	}
+func (g *Game) Render(alpha float64) {
+	//if g.state == stateActive {
+	g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(g.Height)}, 0, DefaultColor)
+	//g.ParticleGenerator.Draw()
+	g.Ball.Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
+	//}
 	g.TextRenderer.Print("Hello, world!", 10, 25, 1)
 }
 
@@ -118,33 +142,28 @@ func (g *Game) Close() {
 	g.Clear()
 }
 
-func (g *Game) processInput(dt float32) {
-	if g.state != stateActive {
-		return
-	}
+func (g *Game) processInput(dt float64) {
+	//if g.state != stateActive {
+	//	return
+	//}
 
 	velocity := playerVelocity * dt
 
+	force := cp.Vector{}
 	if g.Keys[glfw.KeyA] || g.Keys[glfw.KeyLeft] {
-		if g.Ball.Position.X() >= 0 {
-			g.Ball.Position = mgl32.Vec2{g.Ball.Position.X() - velocity, g.Ball.Position.Y()}
-		}
+		force.X = -velocity
 	}
 	if g.Keys[glfw.KeyD] || g.Keys[glfw.KeyRight] {
-		if g.Ball.Position.X() <= float32(g.Width)-g.Ball.Size.X() {
-			g.Ball.Position = mgl32.Vec2{g.Ball.Position.X() + velocity, g.Ball.Position.Y()}
-		}
+		force.X = velocity
 	}
 	if g.Keys[glfw.KeyW] || g.Keys[glfw.KeyUp] {
-		if g.Ball.Position.Y() >= 0 {
-			g.Ball.Position = mgl32.Vec2{g.Ball.Position.X(), g.Ball.Position.Y() - velocity}
-		}
+		force.Y = -velocity
 	}
 	if g.Keys[glfw.KeyS] || g.Keys[glfw.KeyDown] {
-		if g.Ball.Position.Y() <= float32(g.Width)-g.Ball.Size.Y() {
-			g.Ball.Position = mgl32.Vec2{g.Ball.Position.X(), g.Ball.Position.Y()+ velocity}
-		}
+		force.Y = velocity
 	}
+
+	g.Ball.SetVelocityVector(force)
 }
 
 func (g *Game) pause() {
@@ -154,7 +173,6 @@ func (g *Game) pause() {
 func (g *Game) unpause() {
 	g.state = stateActive
 }
-
 
 type Direction int
 

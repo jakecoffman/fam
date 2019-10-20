@@ -2,43 +2,39 @@ package fam
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/jakecoffman/cp"
 )
 
 type Ball struct {
-	*Object
-	Radius float32
+	Texture *Texture2D
+	Color   mgl32.Vec3
+
+	*cp.Body
+	*cp.Shape
+	*cp.Circle
 }
 
-func NewBall(pos mgl32.Vec2, radius float32, velocity mgl32.Vec2, sprite *Texture2D) *Ball {
-	ball := &Ball{}
-	ball.Object = NewGameObject(pos, mgl32.Vec2{radius * 2, radius * 2}, sprite)
-	ball.Color = mgl32.Vec3{1, 1, 1}
-	ball.Velocity = velocity
-	ball.Radius = radius
+func NewBall(pos cp.Vector, radius float64, sprite *Texture2D) *Ball {
+	ball := &Ball{
+		Texture: sprite,
+		Color:   mgl32.Vec3{1, 1, 1},
+	}
+	ball.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
+	ball.Shape = cp.NewCircle(ball.Body, radius, cp.Vector{0, 0})
+	ball.Circle = ball.Shape.Class.(*cp.Circle)
+	ball.Body.SetPosition(pos)
 	return ball
 }
 
-func (b *Ball) Move(dt, windowWidth, windowHeight float32) mgl32.Vec2 {
-	b.Position = b.Position.Add(b.Velocity.Mul(dt))
-	if b.Position.X() <= 0 {
-		b.Velocity = mgl32.Vec2{-b.Velocity.X(), b.Velocity.Y()}
-		b.Position = mgl32.Vec2{0, b.Position.Y()}
-	} else if b.Position.X() + b.Size.X() >= windowWidth {
-		b.Velocity = mgl32.Vec2{-b.Velocity.X(), b.Velocity.Y()}
-		b.Position = mgl32.Vec2{windowWidth-b.Size.X(), b.Position.Y()}
+func (b *Ball) Draw(renderer *SpriteRenderer, last *cp.Vector, alpha float64) {
+	pos := b.Position()
+	if last != nil {
+		pos = pos.Mult(alpha).Add(last.Mult(1.0 - alpha))
 	}
-	if b.Position.Y() <= 0 {
-		b.Velocity = mgl32.Vec2{b.Velocity.X(), -b.Velocity.Y()}
-		b.Position = mgl32.Vec2{b.Position.X(), 0}
-	} else if b.Position.Y() + b.Size.Y() >= windowHeight {
-		b.Velocity = mgl32.Vec2{b.Velocity.X(), -b.Velocity.Y()}
-		b.Position = mgl32.Vec2{b.Position.X(), windowHeight-b.Size.Y()}
+	bb := b.Shape.BB()
+	size := mgl32.Vec2{
+		float32(bb.R - bb.L),
+		float32(bb.T - bb.B),
 	}
-
-	return b.Position
-}
-
-func (b *Ball) Reset(position, velocity mgl32.Vec2) {
-	b.Position = position
-	b.Velocity = velocity
+	renderer.DrawSprite(b.Texture, V(pos), size, 0, b.Color)
 }

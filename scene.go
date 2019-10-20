@@ -10,8 +10,8 @@ import (
 
 type Scene interface {
 	New(width, height int, window *glfw.Window)
-	Render(float32)
-	Update(float32)
+	Render(float64)
+	Update(float64)
 	Close()
 }
 
@@ -32,9 +32,9 @@ func Run(scene Scene, width, height int) {
 	}
 
 	// glfw window creation
-	//monitor := glfw.GetPrimaryMonitor()
-	//videoMode := monitor.GetVideoMode()
-	window, err := glfw.CreateWindow(1024, 768, "Game", nil, nil)
+	monitor := glfw.GetPrimaryMonitor()
+	videoMode := monitor.GetVideoMode()
+	window, err := glfw.CreateWindow(videoMode.Width, videoMode.Height, "Game", monitor, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -50,21 +50,21 @@ func Run(scene Scene, width, height int) {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	const dt = 1./60.
+	const dt = 1. / 60.
 	currentTime := glfw.GetTime()
 	accumulator := 0.0
 
 	frames := 0
 	var lastFps float64
 
-	scene.New(width, height, window)
+	scene.New(videoMode.Width, videoMode.Height, window)
 
 	for !window.ShouldClose() {
 		frames++
 		glfw.PollEvents()
 
 		newTime := glfw.GetTime()
-		if newTime - lastFps > 1 {
+		if newTime-lastFps > 1 {
 			window.SetTitle(fmt.Sprintf("Game | %d FPS", frames))
 			frames = 0
 			lastFps = newTime
@@ -76,7 +76,7 @@ func Run(scene Scene, width, height int) {
 		currentTime = newTime
 		accumulator += frameTime
 
-		for accumulator >= dt{
+		for accumulator >= dt {
 			scene.Update(dt)
 			accumulator -= dt
 		}
@@ -85,7 +85,7 @@ func Run(scene Scene, width, height int) {
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
 		alpha := accumulator / dt
-		scene.Render(float32(alpha))
+		scene.Render(alpha)
 		window.SwapBuffers()
 	}
 

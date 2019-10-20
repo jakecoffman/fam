@@ -10,7 +10,7 @@ import (
 type Particle struct {
 	Position, Velocity mgl32.Vec2
 	Color              mgl32.Vec4
-	Life               float32
+	Life               float64
 }
 
 func NewParticle() *Particle {
@@ -63,7 +63,7 @@ func NewParticleGenerator(shader *Shader, texture *Texture2D, amount int) *Parti
 	return particleGenerator
 }
 
-func (p *ParticleGenerator) Update(dt float32, position, velocity mgl32.Vec2, newParticles int, offset mgl32.Vec2) {
+func (p *ParticleGenerator) Update(dt float64, position, velocity mgl32.Vec2, newParticles int, offset mgl32.Vec2) {
 	for i := 0; i < newParticles; i++ {
 		unusedParticles := p.firstUnusedParticle()
 		p.respawnParticle(p.particles[unusedParticles], position, velocity, offset)
@@ -72,8 +72,8 @@ func (p *ParticleGenerator) Update(dt float32, position, velocity mgl32.Vec2, ne
 		p := p.particles[i]
 		p.Life -= dt
 		if p.Life > 0 {
-			p.Position = p.Position.Sub(p.Velocity.Mul(dt))
-			p.Color = p.Color.Sub(mgl32.Vec4{0, 0, 0, dt*2.5})
+			p.Position = p.Position.Sub(p.Velocity.Mul(float32(dt)))
+			p.Color = p.Color.Sub(mgl32.Vec4{0, 0, 0, float32(dt) * 2.5})
 		}
 	}
 }
