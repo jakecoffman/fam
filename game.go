@@ -15,7 +15,8 @@ type Game struct {
 
 	Space *cp.Space
 
-	Ball *Ball
+	Ball      *Ball
+	OtherBall *Ball
 
 	// used for slerp
 	LastBallPosition cp.Vector
@@ -91,10 +92,31 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
 
 	//playerPos := cp.Vector{g.Width/2.0, g.Height/2}
-	g.Ball = NewBall(cp.Vector{100, 100}, ballRadius, g.Texture("face"))
+	g.Ball = NewBall(cp.Vector{400, 400}, ballRadius, g.Texture("face"))
+	g.Ball.Color = mgl32.Vec3{0, 0, 1}
 	g.Space.AddBody(g.Ball.Body)
 	g.Space.AddShape(g.Ball.Shape)
-	//g.Ball.Body = cp.NewBody(1, cp.MomentForCircle(1, ballRadius, ballRadius, cp.Vector{0, 0}))
+
+	g.OtherBall = NewBall(cp.Vector{0, 0}, ballRadius, g.Texture("face"))
+	g.OtherBall.Color = mgl32.Vec3{1, 0, 0}
+	g.Space.AddBody(g.OtherBall.Body)
+	g.Space.AddShape(g.OtherBall.Shape)
+
+	pivot := g.Space.AddConstraint(cp.NewPivotJoint2(g.Space.StaticBody, g.Ball.Body, cp.Vector{}, cp.Vector{}))
+	pivot.SetMaxBias(0)       // disable joint correction
+	pivot.SetMaxForce(1000.0) // emulate linear friction
+
+	gear := g.Space.AddConstraint(cp.NewGearJoint(g.Space.StaticBody, g.Ball.Body, 0.0, 1.0))
+	gear.SetMaxBias(0)
+	gear.SetMaxForce(5000.0) // emulate angular friction
+
+	pivot = g.Space.AddConstraint(cp.NewPivotJoint2(g.Space.StaticBody, g.OtherBall.Body, cp.Vector{}, cp.Vector{}))
+	pivot.SetMaxBias(0)       // disable joint correction
+	pivot.SetMaxForce(1000.0) // emulate linear friction
+
+	gear = g.Space.AddConstraint(cp.NewGearJoint(g.Space.StaticBody, g.OtherBall.Body, 0.0, 1.0))
+	gear.SetMaxBias(0)
+	gear.SetMaxForce(5000.0) // emulate angular friction
 
 	g.state = stateActive
 
@@ -134,6 +156,8 @@ func (g *Game) Render(alpha float64) {
 	g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(g.Height)}, 0, DefaultColor)
 	//g.ParticleGenerator.Draw()
 	g.Ball.Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
+	g.OtherBall.Draw(g.SpriteRenderer, nil, 0)
+
 	//}
 	g.TextRenderer.Print("Hello, world!", 10, 25, 1)
 }

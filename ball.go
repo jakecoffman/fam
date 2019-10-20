@@ -21,6 +21,8 @@ func NewBall(pos cp.Vector, radius float64, sprite *Texture2D) *Ball {
 	}
 	ball.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	ball.Shape = cp.NewCircle(ball.Body, radius, cp.Vector{0, 0})
+	ball.Shape.SetElasticity(0)
+	ball.Shape.SetFriction(1)
 	ball.Circle = ball.Shape.Class.(*cp.Circle)
 	ball.Body.SetPosition(pos)
 	return ball
