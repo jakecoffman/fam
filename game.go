@@ -5,6 +5,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/cp/examples"
+	"log"
 )
 
 type Game struct {
@@ -15,8 +16,7 @@ type Game struct {
 
 	Space *cp.Space
 
-	Ball      *Ball
-	OtherBall *Ball
+	Players []*Ball
 
 	// used for slerp
 	LastBallPosition cp.Vector
@@ -91,32 +91,34 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	g.ParticleGenerator = NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
 
-	//playerPos := cp.Vector{g.Width/2.0, g.Height/2}
-	g.Ball = NewBall(cp.Vector{400, 400}, ballRadius, g.Texture("face"))
-	g.Ball.Color = mgl32.Vec3{0, 0, 1}
-	g.Space.AddBody(g.Ball.Body)
-	g.Space.AddShape(g.Ball.Shape)
+	joys := []glfw.Joystick{glfw.Joystick1, glfw.Joystick2, glfw.Joystick3, glfw.Joystick4}
+	colors := []mgl32.Vec3{{0, 1, 0}, {0, 0, 1}, DefaultColor, {1, 0, 0}}
+	g.Players = []*Ball{}
+	center := cp.Vector{g.Width / 2, g.Height / 2}
+	for i, joy := range joys {
+		if !glfw.JoystickPresent(joy) {
+			break
+		}
+		g.Players = append(g.Players, NewBall(center, ballRadius, g.Texture("face"), g.Space))
+		g.Players[i].Color = colors[i]
+		g.Players[i].Joystick = joy
+	}
 
-	g.OtherBall = NewBall(cp.Vector{0, 0}, ballRadius, g.Texture("face"))
-	g.OtherBall.Color = mgl32.Vec3{1, 0, 0}
-	g.Space.AddBody(g.OtherBall.Body)
-	g.Space.AddShape(g.OtherBall.Shape)
-
-	pivot := g.Space.AddConstraint(cp.NewPivotJoint2(g.Space.StaticBody, g.Ball.Body, cp.Vector{}, cp.Vector{}))
-	pivot.SetMaxBias(0)       // disable joint correction
-	pivot.SetMaxForce(1000.0) // emulate linear friction
-
-	gear := g.Space.AddConstraint(cp.NewGearJoint(g.Space.StaticBody, g.Ball.Body, 0.0, 1.0))
-	gear.SetMaxBias(0)
-	gear.SetMaxForce(5000.0) // emulate angular friction
-
-	pivot = g.Space.AddConstraint(cp.NewPivotJoint2(g.Space.StaticBody, g.OtherBall.Body, cp.Vector{}, cp.Vector{}))
-	pivot.SetMaxBias(0)       // disable joint correction
-	pivot.SetMaxForce(1000.0) // emulate linear friction
-
-	gear = g.Space.AddConstraint(cp.NewGearJoint(g.Space.StaticBody, g.OtherBall.Body, 0.0, 1.0))
-	gear.SetMaxBias(0)
-	gear.SetMaxForce(5000.0) // emulate angular friction
+	glfw.SetJoystickCallback(func(joy, event int) {
+		if glfw.MonitorEvent(event) == glfw.Connected {
+			if joy+1 <= len(g.Players) {
+				log.Println("Joystick reconnected", joy)
+				return
+			}
+			log.Println("Joystick connected", joy)
+			i := len(g.Players)
+			g.Players = append(g.Players, NewBall(center, ballRadius, g.Texture("face"), g.Space))
+			g.Players[i].Color = colors[i]
+			g.Players[i].Joystick = glfw.Joystick(joy)
+		} else {
+			log.Println("Joystick disconnected", joy)
+		}
+	})
 
 	g.state = stateActive
 
@@ -132,6 +134,12 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 			}
 			glfw.SwapInterval(g.vsync)
 		}
+		if g.Keys[glfw.KeySpace] {
+			i := len(g.Players)
+			g.Players = append(g.Players, NewBall(center, ballRadius, g.Texture("face"), g.Space))
+			g.Players[i].Color = colors[i]
+			g.Players[i].Joystick = glfw.Joystick(-1)
+		}
 		// store for continuous application
 		if key >= 0 && key < 1024 {
 			if action == glfw.Press {
@@ -144,8 +152,9 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 }
 
 func (g *Game) Update(dt float64) {
-	g.LastBallPosition = g.Ball.Position()
-	g.processInput(dt)
+	for i := range g.Players {
+		g.Players[i].processInput(g, dt)
+	}
 	g.Space.Step(dt)
 	//ball := g.Ball
 	//g.ParticleGenerator.Update(dt, ball.Position(), ball.Velocity(), 2, mgl32.Vec2{g.Ball.Radius() / 2, g.Ball.Radius() / 2})
@@ -153,41 +162,19 @@ func (g *Game) Update(dt float64) {
 
 func (g *Game) Render(alpha float64) {
 	//if g.state == stateActive {
-	g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(g.Height)}, 0, DefaultColor)
+	//g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(g.Height)}, 0, DefaultColor)
 	//g.ParticleGenerator.Draw()
-	g.Ball.Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
-	g.OtherBall.Draw(g.SpriteRenderer, nil, 0)
-
+	for i := range g.Players {
+		g.Players[i].Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
+	}
 	//}
-	g.TextRenderer.Print("Hello, world!", 10, 25, 1)
+	if len(g.Players) == 0 {
+		g.TextRenderer.Print("Connect controllers or press SPACE to use keyboard", g.Width/2-250, g.Height/2, 1)
+	}
 }
 
 func (g *Game) Close() {
 	g.Clear()
-}
-
-func (g *Game) processInput(dt float64) {
-	//if g.state != stateActive {
-	//	return
-	//}
-
-	velocity := playerVelocity * dt
-
-	force := cp.Vector{}
-	if g.Keys[glfw.KeyA] || g.Keys[glfw.KeyLeft] {
-		force.X = -velocity
-	}
-	if g.Keys[glfw.KeyD] || g.Keys[glfw.KeyRight] {
-		force.X = velocity
-	}
-	if g.Keys[glfw.KeyW] || g.Keys[glfw.KeyUp] {
-		force.Y = -velocity
-	}
-	if g.Keys[glfw.KeyS] || g.Keys[glfw.KeyDown] {
-		force.Y = velocity
-	}
-
-	g.Ball.SetVelocityVector(force)
 }
 
 func (g *Game) pause() {

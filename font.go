@@ -161,7 +161,8 @@ func (t *TextRenderer) SetColor(red float32, green float32, blue float32, alpha 
 }
 
 //Printf draws a string to the screen, takes a list of arguments like printf
-func (t *TextRenderer) Print(text string, x, y float32, scale float32) {
+func (t *TextRenderer) Print(text string, x64, y64 float64, scale float32) {
+	x, y := float32(x64), float32(y64)
 	indices := []rune(text)
 	if len(indices) == 0 {
 		return
@@ -210,4 +211,3 @@ func (t *TextRenderer) Print(text string, x, y float32, scale float32) {
 	gl.UseProgram(0)
 	return
 }
-
