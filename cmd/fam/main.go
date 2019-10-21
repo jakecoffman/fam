@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	fam.Run(&fam.Game{}, 800, 600)
+	fam.Run(&fam.Game{})
 }

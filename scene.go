@@ -2,6 +2,7 @@ package fam
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -9,13 +10,13 @@ import (
 )
 
 type Scene interface {
-	New(width, height int, window *glfw.Window)
+	New(window *OpenGlWindow)
 	Render(float64)
 	Update(float64)
 	Close()
 }
 
-func Run(scene Scene, width, height int) {
+func Run(scene Scene) {
 	runtime.LockOSThread()
 
 	// glfw: initialize and configure
@@ -31,15 +32,9 @@ func Run(scene Scene, width, height int) {
 		glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 	}
 
-	// glfw window creation
-	monitor := glfw.GetPrimaryMonitor()
-	videoMode := monitor.GetVideoMode()
-	window, err := glfw.CreateWindow(videoMode.Width, videoMode.Height, "Game", monitor, nil)
-	if err != nil {
-		panic(err)
-	}
+	window := NewOpenGlWindow()
+
 	defer window.Destroy()
-	window.MakeContextCurrent()
 
 	if err := gl.Init(); err != nil {
 		panic(err)
@@ -50,6 +45,10 @@ func Run(scene Scene, width, height int) {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
+	viewport := [4]int32{}
+	gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
+	log.Println("Initial viewport:", viewport)
+
 	const dt = 1. / 60.
 	currentTime := glfw.GetTime()
 	accumulator := 0.0
@@ -57,7 +56,7 @@ func Run(scene Scene, width, height int) {
 	frames := 0
 	var lastFps float64
 
-	scene.New(videoMode.Width, videoMode.Height, window)
+	scene.New(window)
 
 	for !window.ShouldClose() {
 		frames++
@@ -83,6 +82,15 @@ func Run(scene Scene, width, height int) {
 
 		gl.ClearColor(0, 0, 0, 0.5)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
+
+		// TODO
+		//if window.UpdateViewport {
+		//	window.UpdateViewport = false
+		//	window.ViewportWidth, window.ViewPortHeight = window.GetFramebufferSize()
+		//	gl.Viewport(0, 0, int32(window.ViewportWidth), int32(window.ViewPortHeight))
+		//	gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
+		//	log.Println("Updated viewport: ", viewport)
+		//}
 
 		alpha := accumulator / dt
 		scene.Render(alpha)

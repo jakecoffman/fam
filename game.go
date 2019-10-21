@@ -9,10 +9,11 @@ import (
 )
 
 type Game struct {
-	state         int
-	Keys          [1024]bool
-	Width, Height float64
-	vsync         int
+	state      int
+	Keys       [1024]bool
+	vsync      int
+	fullscreen bool
+	window     *OpenGlWindow
 
 	Space *cp.Space
 
@@ -24,6 +25,7 @@ type Game struct {
 	*ResourceManager
 	ParticleGenerator *ParticleGenerator
 	SpriteRenderer    *SpriteRenderer
+	PrimitiveRenderer *PrimitiveRenderer
 	TextRenderer      *TextRenderer
 }
 
@@ -35,29 +37,29 @@ const (
 )
 
 var (
-	playerSize          = mgl32.Vec2{100, 20}
-	playerVelocity      = 11250.0
-	initialBallVelocity = Vec2(0, 0)
-	ballRadius          = 25.0
+	playerVelocity = 11250.0
+	ballRadius     = 25.0
 )
 
-func (g *Game) New(w, h int, window *glfw.Window) {
+func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.vsync = 1
-	g.Width = float64(w)
-	g.Height = float64(h)
+	g.window = openGlWindow
 	g.Keys = [1024]bool{}
 	g.Space = cp.NewSpace()
 	g.Space.SetGravity(cp.Vector{0, 0})
+
+	w, h := float64(openGlWindow.Width), float64(openGlWindow.Height)
+	const offset = 25
 	sides := []cp.Vector{
-		{0, 0}, {g.Width, 0},
-		{g.Width, 0}, {g.Width, g.Height},
-		{g.Width, g.Height}, {0, g.Height},
-		{0, g.Height}, {0, 0},
+		{0 - offset, 0 - offset}, {w - offset, 0 - offset},
+		{w - offset, 0 - offset}, {w - offset, h - offset},
+		{w - offset, h - offset}, {0 - offset, h - offset},
+		{0 - offset, h - offset}, {0 - offset, 0 - offset},
 	}
 
 	for i := 0; i < len(sides); i += 2 {
 		var seg *cp.Shape
-		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], 10))
+		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], 1))
 		seg.SetElasticity(1)
 		seg.SetFriction(1)
 		seg.SetFilter(examples.NotGrabbableFilter)
@@ -65,17 +67,18 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 
 	g.ResourceManager = NewResourceManager()
 
-	width, height := float32(g.Width), float32(g.Height)
-
 	g.LoadShader("shaders/main.vs.glsl", "shaders/main.fs.glsl", "sprite")
 	g.LoadShader("shaders/particle.vs.glsl", "shaders/particle.fs.glsl", "particle")
+	g.LoadShader("shaders/primitive.vs.glsl", "shaders/primitive.fs.glsl", "primitive")
 
-	projection := mgl32.Ortho(0, width, height, 0, -1, 1)
+	projection := mgl32.Ortho(0, float32(w), float32(h), 0, -1, 1)
 	g.Shader("sprite").Use().
 		SetInt("sprite", 0).
 		SetMat4("projection", projection)
 	g.Shader("particle").Use().
 		SetInt("sprite", 0).
+		SetMat4("projection", projection)
+	g.Shader("primitive").Use().
 		SetMat4("projection", projection)
 
 	g.LoadTexture("textures/background.jpg", "background")
@@ -85,16 +88,17 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 	g.LoadTexture("textures/banana.png", "banana")
 
 	shader := g.LoadShader("shaders/text.vs.glsl", "shaders/text.fs.glsl", "text")
-	g.TextRenderer = NewTextRenderer(shader, width, height, "textures/Roboto-Light.ttf", 24)
+	g.TextRenderer = NewTextRenderer(shader, float32(w), float32(h), "textures/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
 
 	g.ParticleGenerator = NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
+	g.PrimitiveRenderer = NewPrimitiveRenderer(g.Shader("primitive"))
 
 	joys := []glfw.Joystick{glfw.Joystick1, glfw.Joystick2, glfw.Joystick3, glfw.Joystick4}
 	colors := []mgl32.Vec3{{0, 1, 0}, {0, 0, 1}, DefaultColor, {1, 0, 0}}
 	g.Players = []*Ball{}
-	center := cp.Vector{g.Width / 2, g.Height / 2}
+	center := cp.Vector{w / 2, h / 2}
 	for i, joy := range joys {
 		if !glfw.JoystickPresent(joy) {
 			break
@@ -122,7 +126,7 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 
 	g.state = stateActive
 
-	window.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	openGlWindow.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 		if key == glfw.KeyEscape && action == glfw.Press {
 			window.SetShouldClose(true)
 		}
@@ -133,6 +137,10 @@ func (g *Game) New(w, h int, window *glfw.Window) {
 				g.vsync = 0
 			}
 			glfw.SwapInterval(g.vsync)
+		}
+		if g.Keys[glfw.KeyF] {
+			g.fullscreen = !g.fullscreen
+			openGlWindow.SetFullscreen(g.fullscreen)
 		}
 		if g.Keys[glfw.KeySpace] {
 			i := len(g.Players)
@@ -162,14 +170,17 @@ func (g *Game) Update(dt float64) {
 
 func (g *Game) Render(alpha float64) {
 	//if g.state == stateActive {
-	//g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(g.Height)}, 0, DefaultColor)
+	//g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.Width), float32(h)}, 0, DefaultColor)
 	//g.ParticleGenerator.Draw()
 	for i := range g.Players {
 		g.Players[i].Draw(g.SpriteRenderer, &g.LastBallPosition, alpha)
 	}
 	//}
+
+	g.PrimitiveRenderer.DrawPrimitive(mgl32.Vec2{100, 100}, mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
+
 	if len(g.Players) == 0 {
-		g.TextRenderer.Print("Connect controllers or press SPACE to use keyboard", g.Width/2-250, g.Height/2, 1)
+		g.TextRenderer.Print("Connect controllers or press SPACE to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 }
 
