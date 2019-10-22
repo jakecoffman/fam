@@ -27,9 +27,9 @@ func (s *SpriteRenderer) DrawSprite(texture *Texture2D, position, size mgl32.Vec
 	var model mgl32.Mat4
 	model = mgl32.Translate3D(position.X(), position.Y(), 0)
 
-	model = model.Mul4(mgl32.Translate3D(0.5*size.X(), 0.5*size.Y(), 0))
 	model = model.Mul4(mgl32.HomogRotate3D(float32(rotate), mgl32.Vec3{0, 0, 1}))
 	model = model.Mul4(mgl32.Translate3D(-0.5*size.X(), -0.5*size.Y(), 0))
+	//model = model.Mul4(mgl32.Translate3D(-0.5*size.X(), -0.5*size.Y(), 0))
 
 	model = model.Mul4(mgl32.Scale3D(size.X(), size.Y(), 1))
 

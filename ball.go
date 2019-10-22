@@ -12,6 +12,7 @@ type Ball struct {
 	Color   mgl32.Vec3
 
 	*cp.Body
+	Control *cp.Body
 	*cp.Shape
 	*cp.Circle
 
@@ -30,16 +31,19 @@ func NewBall(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space) 
 	ball.Circle = ball.Shape.Class.(*cp.Circle)
 	ball.Body.SetPosition(pos)
 
+	ball.Control = space.AddBody(cp.NewKinematicBody())
+	pivot := space.AddConstraint(cp.NewPivotJoint2(ball.Control, ball.Body, cp.Vector{}, cp.Vector{}))
+	pivot.SetMaxBias(0)
+	pivot.SetMaxForce(10000)
+
+	gear := space.AddConstraint(cp.NewGearJoint(ball.Control, ball.Body, 0.0, 1.0))
+	gear.SetErrorBias(0) // attempt to fully correct the joint each step
+	gear.SetMaxBias(1.2)
+	gear.SetMaxForce(50000)
+
 	space.AddBody(ball.Body)
 	space.AddShape(ball.Shape)
 
-	pivot := space.AddConstraint(cp.NewPivotJoint2(space.StaticBody, ball.Body, cp.Vector{}, cp.Vector{}))
-	pivot.SetMaxBias(0)       // disable joint correction
-	pivot.SetMaxForce(1000.0) // emulate linear friction
-
-	gear := space.AddConstraint(cp.NewGearJoint(space.StaticBody, ball.Body, 0.0, 1.0))
-	gear.SetMaxBias(0)
-	gear.SetMaxForce(5000.0) // emulate angular friction
 	return ball
 }
 
@@ -76,7 +80,7 @@ func (b *Ball) processInput(g *Game, dt float64) {
 		}
 	}
 
-	b.SetVelocityVector(force)
+	b.Control.SetVelocityVector(force)
 }
 
 func (b *Ball) Draw(renderer *SpriteRenderer, last *cp.Vector, alpha float64) {
@@ -89,5 +93,5 @@ func (b *Ball) Draw(renderer *SpriteRenderer, last *cp.Vector, alpha float64) {
 		float32(bb.R - bb.L),
 		float32(bb.T - bb.B),
 	}
-	renderer.DrawSprite(b.Texture, V(pos), size, 0, b.Color)
+	renderer.DrawSprite(b.Texture, V(pos), size, b.Angle(), b.Color)
 }

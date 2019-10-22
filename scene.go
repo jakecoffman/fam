@@ -83,14 +83,12 @@ func Run(scene Scene) {
 		gl.ClearColor(0, 0, 0, 0.5)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		// TODO
-		//if window.UpdateViewport {
-		//	window.UpdateViewport = false
-		//	window.ViewportWidth, window.ViewPortHeight = window.GetFramebufferSize()
-		//	gl.Viewport(0, 0, int32(window.ViewportWidth), int32(window.ViewPortHeight))
-		//	gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
-		//	log.Println("Updated viewport: ", viewport)
-		//}
+		if window.UpdateViewport {
+			window.UpdateViewport = false
+			window.ViewportWidth, window.ViewPortHeight = window.GetFramebufferSize()
+			gl.Viewport(0, 0, int32(window.ViewportWidth), int32(window.ViewPortHeight))
+			gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
+		}
 
 		alpha := accumulator / dt
 		scene.Render(alpha)

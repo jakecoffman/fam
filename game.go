@@ -26,6 +26,7 @@ type Game struct {
 	ParticleGenerator *ParticleGenerator
 	SpriteRenderer    *SpriteRenderer
 	PrimitiveRenderer *PrimitiveRenderer
+	CPRenderer        *CPRenderer
 	TextRenderer      *TextRenderer
 }
 
@@ -49,7 +50,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.Space.SetGravity(cp.Vector{0, 0})
 
 	w, h := float64(openGlWindow.Width), float64(openGlWindow.Height)
-	const offset = 25
+	const offset = 0
 	sides := []cp.Vector{
 		{0 - offset, 0 - offset}, {w - offset, 0 - offset},
 		{w - offset, 0 - offset}, {w - offset, h - offset},
@@ -70,6 +71,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.LoadShader("shaders/main.vs.glsl", "shaders/main.fs.glsl", "sprite")
 	g.LoadShader("shaders/particle.vs.glsl", "shaders/particle.fs.glsl", "particle")
 	g.LoadShader("shaders/primitive.vs.glsl", "shaders/primitive.fs.glsl", "primitive")
+	g.LoadShader("shaders/cp.vs.glsl", "shaders/cp.fs.glsl", "cp")
 
 	projection := mgl32.Ortho(0, float32(w), float32(h), 0, -1, 1)
 	g.Shader("sprite").Use().
@@ -94,6 +96,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.ParticleGenerator = NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
 	g.PrimitiveRenderer = NewPrimitiveRenderer(g.Shader("primitive"))
+	g.CPRenderer = NewCPRenderer(g.Shader("cp"), projection)
 
 	joys := []glfw.Joystick{glfw.Joystick1, glfw.Joystick2, glfw.Joystick3, glfw.Joystick4}
 	colors := []mgl32.Vec3{{0, 1, 0}, {0, 0, 1}, DefaultColor, {1, 0, 0}}
@@ -177,7 +180,8 @@ func (g *Game) Render(alpha float64) {
 	}
 	//}
 
-	g.PrimitiveRenderer.DrawPrimitive(mgl32.Vec2{100, 100}, mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
+	//g.PrimitiveRenderer.DrawPrimitive(mgl32.Vec2{100, 100}, mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
+	//g.CPRenderer.DrawSpace(g.Space, false)
 
 	if len(g.Players) == 0 {
 		g.TextRenderer.Print("Connect controllers or press SPACE to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
