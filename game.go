@@ -199,31 +199,3 @@ func (g *Game) pause() {
 func (g *Game) unpause() {
 	g.state = stateActive
 }
-
-type Direction int
-
-const (
-	directionUp Direction = iota
-	directionRight
-	directionDown
-	directionLeft
-)
-
-func vectorDirection(target mgl32.Vec2) Direction {
-	compass := []mgl32.Vec2{
-		{0, 1},
-		{1, 0},
-		{0, -1},
-		{-1, 0},
-	}
-	var max float32 = 0.0
-	bestMatch := -1
-	for i := 0; i < 4; i++ {
-		dotProduct := target.Normalize().Dot(compass[i])
-		if dotProduct > max {
-			max = dotProduct
-			bestMatch = i
-		}
-	}
-	return Direction(bestMatch)
-}
