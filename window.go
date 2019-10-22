@@ -50,7 +50,7 @@ func (w *OpenGlWindow) SetFullscreen(fullscreen bool) {
 		w.X, w.Y = w.GetPos()
 		w.Width, w.Height = w.GetSize()
 
-		mode := glfw.GetPrimaryMonitor().GetVideoMode()
+		mode := w.Monitor.GetVideoMode()
 		w.SetMonitor(w.Monitor, 0, 0, mode.Width, mode.Height, 0)
 	} else {
 		w.SetMonitor(nil, w.X, w.Y, w.Width, w.Height, 0)

@@ -53,30 +53,30 @@ const (
 	DrawOutlineWidth   = 1
 )
 
+var (
+	DefaultOutline = FColor{0, .2, .2, 1}
+	DefaultFill = FColor{.8, .8, .8, 1}
+)
+
 type FColor struct {
 	R, G, B, A float32
 }
 
-func (cpr *CPRenderer) DrawSpace(space *cp.Space, drawConstraints bool) {
+func (cpr *CPRenderer) DrawSpace(space *cp.Space) {
 	cpr.ClearRenderer()
 	space.EachShape(func(obj *cp.Shape) {
-		cpr.DrawShape(obj)
+		cpr.DrawShape(obj, DefaultOutline, DefaultFill)
 	})
 	cpr.FlushRenderer()
 
-	if drawConstraints {
-		space.EachConstraint(func(constraint *cp.Constraint) {
-			// TODO
-			cp.DrawConstraint(constraint, nil)
-		})
-	}
+	// TODO
+	//space.EachConstraint(func(constraint *cp.Constraint) {
+	//	cp.DrawConstraint(constraint, nil)
+	//})
 }
 
-func (cpr *CPRenderer) DrawShape(shape *cp.Shape) {
+func (cpr *CPRenderer) DrawShape(shape *cp.Shape, outline, fill FColor) {
 	body := shape.Body()
-
-	outline := FColor{1, 1, 1, 1}
-	fill := FColor{1, 1, 1, 1}
 
 	switch shape.Class.(type) {
 	case *cp.Circle:

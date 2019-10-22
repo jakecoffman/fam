@@ -2,7 +2,6 @@ package fam
 
 import (
 	"fmt"
-	"log"
 	"runtime"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -41,13 +40,8 @@ func Run(scene Scene) {
 	}
 	glfw.SwapInterval(1)
 
-	gl.Enable(gl.CULL_FACE)
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-
-	viewport := [4]int32{}
-	gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
-	log.Println("Initial viewport:", viewport)
 
 	const dt = 1. / 60.
 	currentTime := glfw.GetTime()
@@ -80,15 +74,8 @@ func Run(scene Scene) {
 			accumulator -= dt
 		}
 
-		gl.ClearColor(0, 0, 0, 0.5)
+		gl.ClearColor(0, 0, 0, 1)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
-
-		if window.UpdateViewport {
-			window.UpdateViewport = false
-			window.ViewportWidth, window.ViewPortHeight = window.GetFramebufferSize()
-			gl.Viewport(0, 0, int32(window.ViewportWidth), int32(window.ViewPortHeight))
-			gl.GetIntegerv(gl.VIEWPORT, &viewport[0])
-		}
 
 		alpha := accumulator / dt
 		scene.Render(alpha)
