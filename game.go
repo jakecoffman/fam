@@ -34,7 +34,6 @@ var NotPlayerFilter = cp.ShapeFilter{
 	cp.NO_GROUP, ^PlayerMaskBit, ^PlayerMaskBit,
 }
 
-
 const (
 	_ = iota
 	collisionPlayer
@@ -213,7 +212,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 				// give the mouse click a little radius to make it easier to click small shapes.
 				radius := 5.0
 
-				info := g.Space.PointQueryNearest(g.mouse, radius, GrabFilter)
+				info := g.Space.PointQueryNearest(g.mouse, radius, NotGrabbableFilter)
 
 				if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
 					var nearest cp.Vector

@@ -78,8 +78,7 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 			}
 		}, nil, nil)
 
-		arb.Ignore()
-		return false
+		return true
 	}
 
 	return true
