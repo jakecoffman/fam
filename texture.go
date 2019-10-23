@@ -6,6 +6,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 )
@@ -38,7 +39,8 @@ func (t *Texture2D) Generate(reader io.ReadCloser) {
 	defer reader.Close()
 	img, _, err := image.Decode(reader)
 	if err != nil {
-		panic(err)
+		log.Println("Error decoding image:", err)
+		return
 	}
 
 	rgba := image.NewRGBA(img.Bounds())
