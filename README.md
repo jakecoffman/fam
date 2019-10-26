@@ -4,7 +4,19 @@ a simple game to play with the kids
 
 ## building
 
-Build with Go the usual way, no dependencies except OpenGL drivers which should be on most systems?
+### Windows
+
+TODO
+
+### Mac
+
+TODO
+
+### Ubuntu
+
+```
+sudo apt install xorg-dev libgl1-mesa-dev
+```
 
 ## screenshot
 
