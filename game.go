@@ -341,17 +341,17 @@ func (g *Game) reset() {
 	w, h := float64(g.window.Width), float64(g.window.Height)
 	center := cp.Vector{w / 2, h / 2}
 
-	const offset = 0
+	const borderWidth = 10
 	sides := []cp.Vector{
-		{0 - offset, 0 - offset}, {w - offset, 0 - offset},
-		{w - offset, 0 - offset}, {w - offset, h - offset},
-		{w - offset, h - offset}, {0 - offset, h - offset},
-		{0 - offset, h - offset}, {0 - offset, 0 - offset},
+		{0 - borderWidth, 0 - borderWidth}, {w + borderWidth, 0 - borderWidth},
+		{w + borderWidth, 0 + borderWidth}, {w + borderWidth, h + borderWidth},
+		{w + borderWidth, h + borderWidth}, {0 + borderWidth, h + borderWidth},
+		{0 - borderWidth, h - borderWidth}, {0 - borderWidth, 0 - borderWidth},
 	}
 
 	for i := 0; i < len(sides); i += 2 {
 		var seg *cp.Shape
-		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], 10))
+		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], borderWidth))
 		seg.SetElasticity(1)
 		seg.SetFriction(1)
 		seg.SetFilter(NotGrabbableFilter)
