@@ -83,13 +83,18 @@ var colors = []mgl32.Vec3{
 	{.5, .5, 0}, {0, .5, .5}, {.5, 0, .5}, {.1, .1, .1},
 }
 
+const (
+	worldWidth  = 1920
+	worldHeight = 1080
+)
+
 // Game state
 const (
 	stateActive = iota
 	statePause
 )
 
-var (
+const (
 	playerVelocity = 11250.0
 	playerRadius   = 25.0
 )
@@ -109,17 +114,16 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.LoadShader("shaders/particle.vs.glsl", "shaders/particle.fs.glsl", "particle")
 	g.LoadShader("shaders/cp.vs.glsl", "shaders/cp.fs.glsl", "cp")
 
-	w, h := float64(openGlWindow.Width), float64(openGlWindow.Height)
-	center := cp.Vector{w / 2, h / 2}
+	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
-	g.projection = mgl32.Ortho(0, float32(w), float32(h), 0, -1, 1)
+	g.projection = mgl32.Ortho(0, worldWidth, worldHeight, 0, -1, 1)
 	g.Shader("sprite").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
 	g.Shader("particle").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
 	g.CPRenderer = NewCPRenderer(g.Shader("cp"), g.projection)
 	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
 
 	shader := g.LoadShader("shaders/text.vs.glsl", "shaders/text.fs.glsl", "text")
-	g.TextRenderer = NewTextRenderer(shader, float32(w), float32(h), "fonts/Roboto-Light.ttf", 24)
+	g.TextRenderer = NewTextRenderer(shader, float32(openGlWindow.Width), float32(openGlWindow.Height), "fonts/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
 
 	// Load all textures by name
@@ -282,6 +286,7 @@ func (g *Game) Render(alpha float64) {
 		g.window.UpdateViewport = false
 		g.window.ViewportWidth, g.window.ViewPortHeight = g.window.GetFramebufferSize()
 		gl.Viewport(0, 0, int32(g.window.ViewportWidth), int32(g.window.ViewPortHeight))
+		g.TextRenderer.shader.Use().SetMat4("projection", mgl32.Ortho2D(0, float32(g.window.Width), float32(g.window.Height), 0))
 		log.Printf("update viewport %#v\n", g.window)
 	}
 
@@ -338,15 +343,14 @@ func (g *Game) reset() {
 	bombCollisionHandler := g.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
 	bombCollisionHandler.PreSolveFunc = BombPreSolve
 
-	w, h := float64(g.window.Width), float64(g.window.Height)
-	center := cp.Vector{w / 2, h / 2}
+	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
 	const borderWidth = 10
 	sides := []cp.Vector{
-		{0 - borderWidth, 0 - borderWidth}, {w + borderWidth, 0 - borderWidth},
-		{w + borderWidth, 0 + borderWidth}, {w + borderWidth, h + borderWidth},
-		{w + borderWidth, h + borderWidth}, {0 + borderWidth, h + borderWidth},
-		{0 - borderWidth, h - borderWidth}, {0 - borderWidth, 0 - borderWidth},
+		{0 - borderWidth, 0 - borderWidth}, {worldWidth + borderWidth, 0 - borderWidth},
+		{worldWidth + borderWidth, 0 + borderWidth}, {worldWidth + borderWidth, worldHeight + borderWidth},
+		{worldWidth + borderWidth, worldHeight + borderWidth}, {0 + borderWidth, worldHeight + borderWidth},
+		{0 - borderWidth, worldHeight - borderWidth}, {0 - borderWidth, 0 - borderWidth},
 	}
 
 	for i := 0; i < len(sides); i += 2 {

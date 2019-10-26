@@ -15,7 +15,7 @@ type OpenGlWindow struct {
 
 const (
 	initialWindowWidth  = 1024
-	initialWindowHeight = 768
+	initialWindowHeight = 576
 )
 
 func NewOpenGlWindow() *OpenGlWindow {

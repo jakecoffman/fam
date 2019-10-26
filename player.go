@@ -18,7 +18,7 @@ type Player struct {
 
 	Joystick glfw.Joystick
 
-	LastPosition cp.Vector
+	lastPosition *cp.Vector
 }
 
 func NewPlayer(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space) *Player {
@@ -63,7 +63,8 @@ func (p *Player) Update(g *Game, dt float64) {
 	//	return
 	//}
 
-	//p.LastPosition = p.Position()
+	pos := p.Position()
+	p.lastPosition = &pos
 
 	velocity := playerVelocity * dt
 
@@ -98,7 +99,9 @@ func (p *Player) Update(g *Game, dt float64) {
 
 func (p *Player) Draw(renderer *SpriteRenderer, alpha float64) {
 	pos := p.Position()
-	//pos = pos.Mult(alpha).Add(p.LastPosition.Mult(1.0 - alpha))
+	if p.lastPosition != nil {
+		pos = pos.Mult(alpha).Add(p.lastPosition.Mult(1.0 - alpha))
+	}
 	bb := p.Shape.BB()
 	size := mgl32.Vec2{
 		float32(bb.R - bb.L),
