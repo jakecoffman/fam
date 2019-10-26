@@ -12,19 +12,19 @@ import (
 
 type Gui struct {
 	*imgui.Context
-	platform       *platforms.GLFW
-	renderer       *renderers.OpenGL3
+	platform *platforms.GLFW
+	renderer *renderers.OpenGL3
 
 	game *Game
 
-	showDemoWindow bool
+	showDemoWindow    bool
 	showAnotherWindow bool
 }
 
 func NewGui(game *Game) *Gui {
 	g := &Gui{
 		Context: imgui.CreateContext(nil),
-		game: game,
+		game:    game,
 	}
 	io := imgui.CurrentIO()
 
@@ -85,14 +85,6 @@ func (board clipboard) Text() (string, error) {
 
 func (board clipboard) SetText(text string) {
 	board.platform.SetClipboardText(text)
-}
-
-// Renderer covers rendering imgui draw data.
-type Renderer interface {
-	// PreRender causes the display buffer to be prepared for new output.
-	PreRender(clearColor [4]float32)
-	// Render draws the provided imgui draw data.
-	Render(displaySize [2]float32, framebufferSize [2]float32, drawData imgui.DrawData)
 }
 
 // Run implements the main program loop of the demo. It returns when the platform signals to stop.

@@ -104,5 +104,10 @@ func (p *Player) Draw(renderer *SpriteRenderer, alpha float64) {
 		float32(bb.R - bb.L),
 		float32(bb.T - bb.B),
 	}
-	renderer.DrawSprite(p.Texture, V(pos), size, p.Angle(), p.Color)
+	renderer.DrawSprite(
+		p.Texture,
+		V(pos),
+		size.Mul(1.1), // increase 10% to better fit hitbox
+		p.Angle(),
+		p.Color)
 }

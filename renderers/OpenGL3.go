@@ -41,12 +41,6 @@ func (renderer *OpenGL3) Dispose() {
 	renderer.invalidateDeviceObjects()
 }
 
-// PreRender clears the framebuffer.
-func (renderer *OpenGL3) PreRender(clearColor [4]float32) {
-	gl.ClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3])
-	gl.Clear(gl.COLOR_BUFFER_BIT)
-}
-
 // Render translates the ImGui draw data to OpenGL3 commands.
 func (renderer *OpenGL3) Render(displaySize [2]float32, framebufferSize [2]float32, drawData imgui.DrawData) {
 	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
