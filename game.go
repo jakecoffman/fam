@@ -105,9 +105,10 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	g.ResourceManager = eng.NewResourceManager()
 
-	g.LoadShader("shaders/main.vs.glsl", "shaders/main.fs.glsl", "sprite")
-	g.LoadShader("shaders/particle.vs.glsl", "shaders/particle.fs.glsl", "particle")
-	g.LoadShader("shaders/cp.vs.glsl", "shaders/cp.fs.glsl", "cp")
+	g.LoadShader("assets/shaders/main.vs.glsl", "assets/shaders/main.fs.glsl", "sprite")
+	g.LoadShader("assets/shaders/particle.vs.glsl", "assets/shaders/particle.fs.glsl", "particle")
+	g.LoadShader("assets/shaders/cp.vs.glsl", "assets/shaders/cp.fs.glsl", "cp")
+	g.LoadShader("assets/shaders/text.vs.glsl", "assets/shaders/text.fs.glsl", "text")
 
 	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
@@ -116,13 +117,11 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.Shader("particle").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
 	g.CPRenderer = eng.NewCPRenderer(g.Shader("cp"), g.projection)
 	g.SpriteRenderer = eng.NewSpriteRenderer(g.Shader("sprite"))
-
-	shader := g.LoadShader("shaders/text.vs.glsl", "shaders/text.fs.glsl", "text")
-	g.TextRenderer = eng.NewTextRenderer(shader, float32(openGlWindow.Width), float32(openGlWindow.Height), "fonts/Roboto-Light.ttf", 24)
+	g.TextRenderer = eng.NewTextRenderer(g.Shader("text"), float32(openGlWindow.Width), float32(openGlWindow.Height), "assets/fonts/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
 
 	// Load all textures by name
-	_ = filepath.Walk("textures", func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk("assets/textures", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			panic(err)
 		}
@@ -130,7 +129,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			return nil
 		}
 		log.Println("Loading", info.Name())
-		g.LoadTexture(fmt.Sprintf("textures/%v", info.Name()), strings.TrimSuffix(info.Name(), filepath.Ext(info.Name())))
+		g.LoadTexture(fmt.Sprintf("assets/textures/%v", info.Name()), strings.TrimSuffix(info.Name(), filepath.Ext(info.Name())))
 		return nil
 	})
 
