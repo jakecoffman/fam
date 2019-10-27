@@ -8,15 +8,14 @@ import (
 type Banana struct {
 	Texture *Texture2D
 
-	*cp.Body
-	*cp.Shape
-	*cp.Circle
+	*Object
 
 	lastPosition *cp.Vector
 }
 
 func NewBanana(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space) *Banana {
 	p := &Banana{
+		Object: &Object{},
 		Texture: sprite,
 	}
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
@@ -29,7 +28,6 @@ func NewBanana(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space
 	p.Shape.SetFilter(PlayerFilter)
 
 	p.Shape.UserData = p
-	p.Circle = p.Shape.Class.(*cp.Circle)
 	p.Body.SetPosition(pos)
 	space.AddBody(p.Body)
 	space.AddShape(p.Shape)
@@ -37,21 +35,11 @@ func NewBanana(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space
 }
 
 func (p *Banana) Update(g *Game, dt float64) {
-	pos := p.Position()
-	p.lastPosition = &pos
+	p.Object.Update(g, dt)
 }
 
 func (p *Banana) Draw(renderer *SpriteRenderer, alpha float64) {
-	pos := p.Position()
-	if p.lastPosition != nil {
-		pos = pos.Mult(alpha).Add(p.lastPosition.Mult(1.0 - alpha))
-	}
-	bb := p.Shape.BB()
-	size := mgl32.Vec2{
-		float32(bb.R - bb.L),
-		float32(bb.T - bb.B),
-	}
-	renderer.DrawSprite(p.Texture, V(pos), size, p.Angle(), mgl32.Vec3{1, 1, 1})
+	renderer.DrawSprite(p.Texture, p.SmoothPos(alpha), p.Size(), p.Angle(), mgl32.Vec3{1, 1, 1})
 }
 
 func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
@@ -64,7 +52,7 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	case *Player:
 		player := b.UserData.(*Player)
 
-		player.SetRadius(player.Radius() * 1.1)
+		player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
 			if banana.Shape == nil {

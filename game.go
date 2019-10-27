@@ -78,11 +78,6 @@ type Game struct {
 	shouldRenderCp bool
 }
 
-var colors = []mgl32.Vec3{
-	{0, 1, 0}, {0, 0, 1}, DefaultColor, {1, 0, 0},
-	{.5, .5, 0}, {0, .5, .5}, {.5, 0, .5}, {.1, .1, .1},
-}
-
 const (
 	worldWidth  = 1920
 	worldHeight = 1080
@@ -152,8 +147,8 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 			log.Println("Joystick connected", joy)
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Texture("face"), g.Space))
-			g.Players[i].Color = colors[i]
+			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
+			g.Players[i].Color = getNextColor()
 			g.Players[i].Joystick = glfw.Joystick(joy)
 		} else {
 			log.Println("Joystick disconnected", joy)
@@ -166,8 +161,8 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 		if !glfw.JoystickPresent(joy) {
 			break
 		}
-		g.Players = append(g.Players, NewPlayer(center, playerRadius, g.Texture("face"), g.Space))
-		g.Players[i].Color = colors[i]
+		g.Players = append(g.Players, NewPlayer(center, playerRadius, g.Space))
+		g.Players[i].Color = getNextColor()
 		g.Players[i].Joystick = joy
 	}
 
@@ -193,8 +188,8 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 		if g.Keys[glfw.KeySpace] {
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Texture("face"), g.Space))
-			g.Players[i].Color = colors[i%len(colors)]
+			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
+			g.Players[i].Color = getNextColor()
 			g.Players[i].Joystick = glfw.Joystick(-1)
 		}
 		// store for continuous application
@@ -235,7 +230,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 					if g.lmbAction == actionBanana {
 						g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
 					} else if g.lmbAction == actionBomb {
-						g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Texture("bomb"), g.Texture("pow"), g.Space))
+						g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
 					}
 				}
 			} else if g.mouseJoint != nil {
@@ -250,7 +245,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 				if g.rmbAction == actionBanana {
 					g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
 				} else if g.rmbAction == actionBomb {
-					g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Texture("bomb"), g.Texture("pow"), g.Space))
+					g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
 				}
 			}
 		}
@@ -301,10 +296,10 @@ func (g *Game) Render(alpha float64) {
 		g.Bananas[i].Draw(g.SpriteRenderer, alpha)
 	}
 	for i := range g.Bombs {
-		g.Bombs[i].Draw(g.SpriteRenderer, alpha)
+		g.Bombs[i].Draw(g, alpha)
 	}
 	for i := range g.Players {
-		g.Players[i].Draw(g.SpriteRenderer, alpha)
+		g.Players[i].Draw(g, alpha)
 	}
 	//}
 

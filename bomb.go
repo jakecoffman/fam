@@ -6,14 +6,10 @@ import (
 )
 
 type Bomb struct {
-	Texture, Boom *Texture2D
-	radius        float64
+	radius float64
 
-	*cp.Body
-	*cp.Shape
-	*cp.Circle
-
-	lastPosition *cp.Vector
+	*Object
+	Circle *cp.Circle
 
 	state bombState
 	time  float64
@@ -27,11 +23,15 @@ const (
 	bombStateGone
 )
 
-func NewBomb(pos cp.Vector, radius float64, sprite, boom *Texture2D, space *cp.Space) *Bomb {
+const (
+	bombTexture    = "bomb"
+	bombPowTexture = "pow"
+)
+
+func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
 	p := &Bomb{
-		Texture: sprite,
-		Boom:    boom,
-		state:   bombStateOk,
+		Object: &Object{},
+		state:  bombStateOk,
 	}
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	// the bomb body is smaller because of the wick, so make it a little smaller
@@ -56,8 +56,7 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	if p.state == bombStateGone {
 		return
 	}
-	pos := p.Position()
-	p.lastPosition = &pos
+	p.Object.Update(g, dt)
 	p.time += dt
 	if p.time > 5 && p.state != bombStateBoom {
 		p.state = bombStateBoom
@@ -73,39 +72,28 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	}
 }
 
-func (p *Bomb) Draw(renderer *SpriteRenderer, alpha float64) {
+func (p *Bomb) Draw(g *Game, alpha float64) {
 	if p.state == bombStateGone {
 		return
 	}
 
-	pos := p.Position()
-	if p.lastPosition != nil {
-		pos = pos.Mult(alpha).Add(p.lastPosition.Mult(1.0 - alpha))
-	}
-	bb := p.Shape.BB()
+	color := mgl32.Vec3{1, 1, 1}
+	var texture *Texture2D
 
 	switch p.state {
 	case bombStateOk:
-		size := mgl32.Vec2{
-			// doubling the size of bomb
-			float32(bb.R-bb.L) * 2,
-			float32(bb.T-bb.B) * 2,
-		}
-		if int(p.time)%2 == 0 {
-			renderer.DrawSprite(p.Texture, V(pos), size, p.Angle(), mgl32.Vec3{1, 1, 1})
-		} else {
-			renderer.DrawSprite(p.Texture, V(pos), size, p.Angle(), mgl32.Vec3{.5, .5, .5})
+		texture = g.Texture(bombTexture)
+		if int(p.time)%2 != 0 {
+			// flash of grey representing bomb ticking ala Zelda bombs
+			color = mgl32.Vec3{.5, .5, .5}
 		}
 	case bombStateBoom:
-		size := mgl32.Vec2{
-			// shrinking explosion sprite
-			float32(bb.R-bb.L) * 2,
-			float32(bb.T-bb.B) * 2,
-		}
-		renderer.DrawSprite(p.Boom, V(pos), size, p.Angle(), mgl32.Vec3{1, 1, 1})
+		texture = g.Texture(bombPowTexture)
 	default:
 		return
 	}
+
+	g.SpriteRenderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
 }
 
 func BombPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
@@ -119,7 +107,7 @@ func BombPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	switch b.UserData.(type) {
 	case *Player:
 		player := b.UserData.(*Player)
-		player.SetRadius(playerRadius)
+		player.Circle.SetRadius(playerRadius)
 		return true
 	}
 

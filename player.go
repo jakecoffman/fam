@@ -8,22 +8,20 @@ import (
 )
 
 type Player struct {
-	Texture *Texture2D
 	Color   mgl32.Vec3
 
-	*cp.Body
+	*Object
 	Control *cp.Body
-	*cp.Shape
-	*cp.Circle
+	Circle *cp.Circle
 
 	Joystick glfw.Joystick
 
 	lastPosition *cp.Vector
 }
 
-func NewPlayer(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space) *Player {
+func NewPlayer(pos cp.Vector, radius float64, space *cp.Space) *Player {
 	p := &Player{
-		Texture: sprite,
+		Object: &Object{},
 		Color:   mgl32.Vec3{1, 1, 1},
 	}
 	p.Reset(pos, radius, space)
@@ -63,8 +61,7 @@ func (p *Player) Update(g *Game, dt float64) {
 	//	return
 	//}
 
-	pos := p.Position()
-	p.lastPosition = &pos
+	p.Object.Update(g, dt)
 
 	velocity := playerVelocity * dt
 
@@ -97,20 +94,11 @@ func (p *Player) Update(g *Game, dt float64) {
 	p.Control.SetVelocityVector(force)
 }
 
-func (p *Player) Draw(renderer *SpriteRenderer, alpha float64) {
-	pos := p.Position()
-	if p.lastPosition != nil {
-		pos = pos.Mult(alpha).Add(p.lastPosition.Mult(1.0 - alpha))
-	}
-	bb := p.Shape.BB()
-	size := mgl32.Vec2{
-		float32(bb.R - bb.L),
-		float32(bb.T - bb.B),
-	}
-	renderer.DrawSprite(
-		p.Texture,
-		V(pos),
-		size.Mul(1.1), // increase 10% to better fit hitbox
+func (p *Player) Draw(g *Game, alpha float64) {
+	g.SpriteRenderer.DrawSprite(
+		g.Texture("face"),
+		p.SmoothPos(alpha),
+		p.Size().Mul(1.1), // increase 10% to better fit hitbox
 		p.Angle(),
 		p.Color)
 }
