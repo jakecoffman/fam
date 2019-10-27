@@ -2,8 +2,9 @@ package main
 
 import (
 	"github.com/jakecoffman/fam"
+	"github.com/jakecoffman/fam/eng"
 )
 
 func main() {
-	fam.Run(&fam.Game{})
+	eng.Run(&fam.Game{})
 }

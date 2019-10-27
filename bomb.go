@@ -3,12 +3,13 @@ package fam
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
 )
 
 type Bomb struct {
 	radius float64
 
-	*Object
+	*eng.Object
 	Circle *cp.Circle
 
 	state bombState
@@ -30,7 +31,7 @@ const (
 
 func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
 	p := &Bomb{
-		Object: &Object{},
+		Object: &eng.Object{},
 		state:  bombStateOk,
 	}
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
@@ -56,7 +57,7 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	if p.state == bombStateGone {
 		return
 	}
-	p.Object.Update(g, dt)
+	p.Object.Update(dt)
 	p.time += dt
 	if p.time > 5 && p.state != bombStateBoom {
 		p.state = bombStateBoom
@@ -78,7 +79,7 @@ func (p *Bomb) Draw(g *Game, alpha float64) {
 	}
 
 	color := mgl32.Vec3{1, 1, 1}
-	var texture *Texture2D
+	var texture *eng.Texture2D
 
 	switch p.state {
 	case bombStateOk:

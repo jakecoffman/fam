@@ -4,13 +4,14 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
 	"math"
 )
 
 type Player struct {
 	Color   mgl32.Vec3
 
-	*Object
+	*eng.Object
 	Control *cp.Body
 	Circle *cp.Circle
 
@@ -21,7 +22,7 @@ type Player struct {
 
 func NewPlayer(pos cp.Vector, radius float64, space *cp.Space) *Player {
 	p := &Player{
-		Object: &Object{},
+		Object: &eng.Object{},
 		Color:   mgl32.Vec3{1, 1, 1},
 	}
 	p.Reset(pos, radius, space)
@@ -35,7 +36,7 @@ func (p *Player) Reset(pos cp.Vector, radius float64, space *cp.Space) {
 	p.Shape.SetElasticity(0)
 	p.Shape.SetFriction(1)
 
-	p.Shape.SetFilter(cp.NewShapeFilter(uint(GetObjectId()), PlayerMaskBit, PlayerMaskBit))
+	p.Shape.SetFilter(cp.NewShapeFilter(uint(eng.GetObjectId()), PlayerMaskBit, PlayerMaskBit))
 	p.Shape.SetCollisionType(collisionPlayer)
 	p.Shape.UserData = p
 
@@ -61,7 +62,7 @@ func (p *Player) Update(g *Game, dt float64) {
 	//	return
 	//}
 
-	p.Object.Update(g, dt)
+	p.Object.Update(dt)
 
 	velocity := playerVelocity * dt
 

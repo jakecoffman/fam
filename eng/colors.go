@@ -1,4 +1,4 @@
-package fam
+package eng
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
@@ -70,7 +70,7 @@ var Colors = []mgl32.Vec3{
 
 var colorCursor = 7
 
-func getNextColor() mgl32.Vec3 {
+func NextColor() mgl32.Vec3 {
 	color := Colors[colorCursor]
 	colorCursor++
 	if colorCursor >= len(Colors) {

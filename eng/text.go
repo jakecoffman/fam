@@ -1,4 +1,4 @@
-package fam
+package eng
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 )
 
 type TextRenderer struct {
-	shader   *Shader
+	*Shader
 	vao, vbo uint32
 	fontChar []character
 	texture  uint32 // Holds the glyph texture id.
@@ -47,7 +47,7 @@ func NewTextRenderer(shader *Shader, width, height float32, font string, scale u
 	r := &TextRenderer{
 		vao:    VAO,
 		vbo:    VBO,
-		shader: shader,
+		Shader: shader,
 	}
 	if err := r.Load(font, scale); err != nil {
 		panic(err)
@@ -157,7 +157,7 @@ func (t *TextRenderer) Load(fontPath string, scale uint32) error {
 
 //SetColor allows you to set the text color to be used when you draw the text
 func (t *TextRenderer) SetColor(red float32, green float32, blue float32, alpha float32) {
-	t.shader.Use().SetVec4f("textColor", mgl32.Vec4{red, green, blue, alpha})
+	t.Use().SetVec4f("textColor", mgl32.Vec4{red, green, blue, alpha})
 }
 
 //Printf draws a string to the screen, takes a list of arguments like printf
@@ -167,7 +167,7 @@ func (t *TextRenderer) Print(text string, x64, y64 float64, scale float32) {
 	if len(indices) == 0 {
 		return
 	}
-	t.shader.Use()
+	t.Use()
 
 	lowChar := rune(32)
 

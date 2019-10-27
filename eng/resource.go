@@ -1,4 +1,4 @@
-package fam
+package eng
 
 import (
 	"io/ioutil"
@@ -7,7 +7,6 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 )
 
-// Singleton
 type ResourceManager struct {
 	shaders map[string]*Shader
 	textures map[string]*Texture2D

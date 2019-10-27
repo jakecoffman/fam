@@ -3,19 +3,20 @@ package fam
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
 )
 
 type Banana struct {
-	Texture *Texture2D
+	Texture *eng.Texture2D
 
-	*Object
+	*eng.Object
 
 	lastPosition *cp.Vector
 }
 
-func NewBanana(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space) *Banana {
+func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.Space) *Banana {
 	p := &Banana{
-		Object: &Object{},
+		Object: &eng.Object{},
 		Texture: sprite,
 	}
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
@@ -35,10 +36,10 @@ func NewBanana(pos cp.Vector, radius float64, sprite *Texture2D, space *cp.Space
 }
 
 func (p *Banana) Update(g *Game, dt float64) {
-	p.Object.Update(g, dt)
+	p.Object.Update(dt)
 }
 
-func (p *Banana) Draw(renderer *SpriteRenderer, alpha float64) {
+func (p *Banana) Draw(renderer *eng.SpriteRenderer, alpha float64) {
 	renderer.DrawSprite(p.Texture, p.SmoothPos(alpha), p.Size(), p.Angle(), mgl32.Vec3{1, 1, 1})
 }
 

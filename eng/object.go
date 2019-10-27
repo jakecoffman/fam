@@ -1,4 +1,4 @@
-package fam
+package eng
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
@@ -19,7 +19,7 @@ type Object struct {
 	lastPosition *cp.Vector
 }
 
-func (p *Object) Update(g *Game, dt float64) {
+func (p *Object) Update(dt float64) {
 	pos := p.Position()
 	p.lastPosition = &pos
 }

@@ -2,17 +2,17 @@ package fam
 
 import (
 	"fmt"
+	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
 	"log"
 	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/jakecoffman/cp"
 )
 
 var GrabbableMaskBit uint = 1 << 31
@@ -51,7 +51,7 @@ type Game struct {
 	Keys       [1024]bool
 	vsync      bool
 	fullscreen bool
-	window     *OpenGlWindow
+	window     *eng.OpenGlWindow
 	gui        *Gui
 
 	projection mgl32.Mat4
@@ -69,11 +69,11 @@ type Game struct {
 	Bananas []*Banana
 	Bombs   []*Bomb
 
-	*ResourceManager
-	ParticleGenerator *ParticleGenerator
-	SpriteRenderer    *SpriteRenderer
-	CPRenderer        *CPRenderer
-	TextRenderer      *TextRenderer
+	*eng.ResourceManager
+	ParticleGenerator *eng.ParticleGenerator
+	SpriteRenderer    *eng.SpriteRenderer
+	CPRenderer        *eng.CPRenderer
+	TextRenderer      *eng.TextRenderer
 
 	shouldRenderCp bool
 }
@@ -94,7 +94,7 @@ const (
 	playerRadius   = 25.0
 )
 
-func (g *Game) New(openGlWindow *OpenGlWindow) {
+func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.vsync = true
 	g.window = openGlWindow
 	g.gui = NewGui(g)
@@ -103,7 +103,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.lmbAction = actionBanana
 	g.rmbAction = actionBomb
 
-	g.ResourceManager = NewResourceManager()
+	g.ResourceManager = eng.NewResourceManager()
 
 	g.LoadShader("shaders/main.vs.glsl", "shaders/main.fs.glsl", "sprite")
 	g.LoadShader("shaders/particle.vs.glsl", "shaders/particle.fs.glsl", "particle")
@@ -114,11 +114,11 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 	g.projection = mgl32.Ortho(0, worldWidth, worldHeight, 0, -1, 1)
 	g.Shader("sprite").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
 	g.Shader("particle").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
-	g.CPRenderer = NewCPRenderer(g.Shader("cp"), g.projection)
-	g.SpriteRenderer = NewSpriteRenderer(g.Shader("sprite"))
+	g.CPRenderer = eng.NewCPRenderer(g.Shader("cp"), g.projection)
+	g.SpriteRenderer = eng.NewSpriteRenderer(g.Shader("sprite"))
 
 	shader := g.LoadShader("shaders/text.vs.glsl", "shaders/text.fs.glsl", "text")
-	g.TextRenderer = NewTextRenderer(shader, float32(openGlWindow.Width), float32(openGlWindow.Height), "fonts/Roboto-Light.ttf", 24)
+	g.TextRenderer = eng.NewTextRenderer(shader, float32(openGlWindow.Width), float32(openGlWindow.Height), "fonts/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
 
 	// Load all textures by name
@@ -134,7 +134,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 		return nil
 	})
 
-	g.ParticleGenerator = NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
+	g.ParticleGenerator = eng.NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 
 	g.reset()
 
@@ -148,7 +148,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
 			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
-			g.Players[i].Color = getNextColor()
+			g.Players[i].Color = eng.NextColor()
 			g.Players[i].Joystick = glfw.Joystick(joy)
 		} else {
 			log.Println("Joystick disconnected", joy)
@@ -162,7 +162,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 			break
 		}
 		g.Players = append(g.Players, NewPlayer(center, playerRadius, g.Space))
-		g.Players[i].Color = getNextColor()
+		g.Players[i].Color = eng.NextColor()
 		g.Players[i].Joystick = joy
 	}
 
@@ -189,7 +189,7 @@ func (g *Game) New(openGlWindow *OpenGlWindow) {
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
 			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
-			g.Players[i].Color = getNextColor()
+			g.Players[i].Color = eng.NextColor()
 			g.Players[i].Joystick = glfw.Joystick(-1)
 		}
 		// store for continuous application
@@ -281,7 +281,7 @@ func (g *Game) Render(alpha float64) {
 		g.window.UpdateViewport = false
 		g.window.ViewportWidth, g.window.ViewPortHeight = g.window.GetFramebufferSize()
 		gl.Viewport(0, 0, int32(g.window.ViewportWidth), int32(g.window.ViewPortHeight))
-		g.TextRenderer.shader.Use().SetMat4("projection", mgl32.Ortho2D(0, float32(g.window.Width), float32(g.window.Height), 0))
+		g.TextRenderer.Use().SetMat4("projection", mgl32.Ortho2D(0, float32(g.window.Width), float32(g.window.Height), 0))
 		log.Printf("update viewport %#v\n", g.window)
 	}
 
