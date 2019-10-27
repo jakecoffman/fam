@@ -1,4 +1,4 @@
-package renderers
+package gui
 
 import (
 	"unsafe"

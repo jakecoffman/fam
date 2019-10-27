@@ -6,14 +6,13 @@ import (
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/inkyblackness/imgui-go"
-	"github.com/jakecoffman/fam/platforms"
-	"github.com/jakecoffman/fam/renderers"
+	"github.com/jakecoffman/fam/gui"
 )
 
 type Gui struct {
 	*imgui.Context
-	platform *platforms.GLFW
-	renderer *renderers.OpenGL3
+	platform *gui.GLFW
+	renderer *gui.OpenGL3
 
 	game *Game
 
@@ -28,14 +27,14 @@ func NewGui(game *Game) *Gui {
 	}
 	io := imgui.CurrentIO()
 
-	platform, err := platforms.NewGLFW(io, game.window.Window)
+	platform, err := gui.NewGLFW(io, game.window.Window)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(-1)
 	}
 	g.platform = platform
 
-	renderer, err := renderers.NewOpenGL3(io)
+	renderer, err := gui.NewOpenGL3(io)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(-1)

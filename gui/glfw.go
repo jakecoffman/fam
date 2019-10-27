@@ -1,4 +1,4 @@
-package platforms
+package gui
 
 import (
 	"math"
