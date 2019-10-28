@@ -109,32 +109,20 @@ func (gui *Gui) Render() {
 		}
 
 		// LMB, RMB action
-		items := []string{actionBanana, actionBomb}
+		//items := []string{actionBanana, actionBomb}
 
-		if imgui.BeginComboV("LMB", gui.game.lmbAction, imgui.ComboFlagNoArrowButton) {
-			for _, item := range items {
-				isSelected := gui.game.lmbAction == item
-				if imgui.SelectableV(item, isSelected, 0, imgui.Vec2{}) {
-					gui.game.lmbAction = item
-				}
-				if isSelected {
-					imgui.SetItemDefaultFocus()
-				}
-			}
-			imgui.EndCombo()
-		}
-		if imgui.BeginComboV("RMB", gui.game.rmbAction, imgui.ComboFlagNoArrowButton) {
-			for _, item := range items {
-				isSelected := gui.game.rmbAction == item
-				if imgui.SelectableV(item, isSelected, 0, imgui.Vec2{}) {
-					gui.game.rmbAction = item
-				}
-				if isSelected {
-					imgui.SetItemDefaultFocus()
-				}
-			}
-			imgui.EndCombo()
-		}
+		//if imgui.BeginComboV("LMB", gui.game.lmbAction, imgui.ComboFlagNoArrowButton) {
+		//	for _, item := range items {
+		//		isSelected := gui.game.lmbAction == item
+		//		if imgui.SelectableV(item, isSelected, 0, imgui.Vec2{}) {
+		//			gui.game.lmbAction = item
+		//		}
+		//		if isSelected {
+		//			imgui.SetItemDefaultFocus()
+		//		}
+		//	}
+		//	imgui.EndCombo()
+		//}
 
 		if imgui.Button("Reset objects") {
 			gui.game.reset()
@@ -150,11 +138,8 @@ func (gui *Gui) Render() {
 		}
 
 		if imgui.ButtonV("Quit", imgui.Vec2{200, 20}) {
-			//gui.counter++
 			gui.game.window.SetShouldClose(true)
 		}
-		//imgui.SameLine()
-		//imgui.Text(fmt.Sprintf("counter = %d", gui.counter))
 
 		// TODO add text of FPS based on IO.Framerate()
 

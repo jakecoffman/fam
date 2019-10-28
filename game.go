@@ -41,11 +41,6 @@ const (
 	collisionBomb
 )
 
-const (
-	actionBanana = "banana"
-	actionBomb   = "bomb"
-)
-
 type Game struct {
 	state      int
 	Keys       [1024]bool
@@ -57,17 +52,21 @@ type Game struct {
 	projection mgl32.Mat4
 
 	// mouse stuff
-	mouse                 cp.Vector
-	mouseBody             *cp.Body
-	mouseJoint            *cp.Constraint
-	rightDown, rightClick bool
-	lmbAction, rmbAction  string
+	mouse      cp.Vector
+	mouseBody  *cp.Body
+	mouseJoint *cp.Constraint
+
+	leftDown  *cp.Vector
+	rightDown *cp.Vector
+
+	drawingWallShape *cp.Segment
 
 	Space *cp.Space
 
 	Players []*Player
 	Bananas []*Banana
 	Bombs   []*Bomb
+	Walls   []*cp.Segment
 
 	*eng.ResourceManager
 	ParticleGenerator *eng.ParticleGenerator
@@ -100,8 +99,6 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.gui = NewGui(g)
 	g.Keys = [1024]bool{}
 	g.mouseBody = cp.NewKinematicBody()
-	g.lmbAction = actionBanana
-	g.rmbAction = actionBomb
 
 	g.ResourceManager = eng.NewResourceManager()
 
@@ -180,6 +177,12 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 				g.unpause()
 			}
 		}
+		if g.Keys[glfw.KeyE] {
+			g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
+		}
+		if g.Keys[glfw.KeyQ] {
+			g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
+		}
 		if g.Keys[glfw.KeyF] {
 			g.fullscreen = !g.fullscreen
 			openGlWindow.SetFullscreen(g.fullscreen)
@@ -226,26 +229,34 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 					g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
 					g.Space.AddConstraint(g.mouseJoint)
 				} else {
-					if g.lmbAction == actionBanana {
-						g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
-					} else if g.lmbAction == actionBomb {
-						g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
-					}
+					leftDown := g.mouse.Clone()
+					g.leftDown = &leftDown
+					seg := cp.NewSegment(g.Space.StaticBody, *g.leftDown, g.mouse, 10)
+					seg.SetElasticity(1)
+					seg.SetFriction(1)
+					g.drawingWallShape = seg.Class.(*cp.Segment)
+					g.Walls = append(g.Walls, g.drawingWallShape)
 				}
-			} else if g.mouseJoint != nil {
+				return
+			}
+			// mouse up
+			if g.mouseJoint != nil {
 				g.Space.RemoveConstraint(g.mouseJoint)
 				g.mouseJoint = nil
+				return
 			}
-		} else if button == glfw.MouseButton2 {
-			g.rightDown = action == glfw.Press
-			g.rightClick = g.rightDown
+			if g.leftDown != nil {
+				g.leftDown = nil
+			}
+			return
+		}
 
+		if button == glfw.MouseButton2 {
 			if action == glfw.Press {
-				if g.rmbAction == actionBanana {
-					g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
-				} else if g.rmbAction == actionBomb {
-					g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
-				}
+				rightDown := g.mouse.Clone()
+				g.rightDown = &rightDown
+			} else {
+				g.rightDown = nil
 			}
 		}
 	})
@@ -259,6 +270,13 @@ func (g *Game) Update(dt float64) {
 	newPoint := g.mouseBody.Position().Lerp(g.mouse, 0.25)
 	g.mouseBody.SetVelocityVector(newPoint.Sub(g.mouseBody.Position()).Mult(60.0))
 	g.mouseBody.SetPosition(newPoint)
+
+	if g.leftDown != nil {
+		g.drawingWallShape.SetEndpoints(*g.leftDown, g.mouse)
+	} else if g.drawingWallShape != nil {
+		g.Space.AddShape(g.drawingWallShape.Shape)
+		g.drawingWallShape = nil
+	}
 
 	for i := range g.Bombs {
 		g.Bombs[i].Update(g, dt)
@@ -300,6 +318,13 @@ func (g *Game) Render(alpha float64) {
 	for i := range g.Players {
 		g.Players[i].Draw(g, alpha)
 	}
+	g.CPRenderer.ClearRenderer()
+	for _, wall := range g.Walls {
+		g.CPRenderer.DrawFatSegment(wall.A(), wall.B(), wall.Radius(), eng.DefaultOutline, eng.DefaultFill)
+	}
+	if len(g.Walls) > 0 {
+		g.CPRenderer.FlushRenderer()
+	}
 	//}
 
 	if len(g.Players) == 0 {
@@ -328,7 +353,7 @@ func (g *Game) unpause() {
 
 func (g *Game) reset() {
 	g.Space = cp.NewSpace()
-	g.Space.SetGravity(cp.Vector{0, 0})
+	g.Space.SetGravity(cp.Vector{0, 1_000})
 
 	bananaCollisionHandler := g.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
 	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
@@ -361,6 +386,7 @@ func (g *Game) reset() {
 	}
 	g.Bananas = []*Banana{}
 	g.Bombs = []*Bomb{}
+	g.Walls = []*cp.Segment{}
 }
 
 func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {
