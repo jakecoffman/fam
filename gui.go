@@ -2,11 +2,13 @@ package fam
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/inkyblackness/imgui-go"
 	"github.com/jakecoffman/fam/gui"
+	"github.com/sqweek/dialog"
 )
 
 type Gui struct {
@@ -106,6 +108,24 @@ func (gui *Gui) Render() {
 
 		if imgui.Button("Resume game") {
 			gui.game.unpause()
+		}
+
+		if imgui.Button("Save level") {
+			filename, err := dialog.File().Filter("JSON files", "json").Title("Save Level").Save()
+			if err != nil {
+				log.Println(err)
+			} else {
+				gui.game.saveLevel(filename)
+			}
+		}
+
+		if imgui.Button("Load level") {
+			filename, err := dialog.File().Filter("JSON files", "json").Title("Load Level").Load()
+			if err != nil {
+				log.Println(err)
+			} else {
+				_ = gui.game.loadLevel(filename)
+			}
 		}
 
 		// LMB, RMB action

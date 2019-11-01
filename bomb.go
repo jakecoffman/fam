@@ -38,7 +38,7 @@ func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
 	// the bomb body is smaller because of the wick, so make it a little smaller
 	p.Shape = cp.NewCircle(p.Body, radius, cp.Vector{-radius, radius})
 	p.Shape.SetElasticity(1)
-	p.Shape.SetFriction(0)
+	p.Shape.SetFriction(1)
 
 	p.Shape.SetCollisionType(collisionBomb)
 	p.Shape.SetFilter(PlayerFilter)
@@ -57,7 +57,7 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	if p.state == bombStateGone {
 		return
 	}
-	p.Object.Update(dt)
+	p.Object.Update(dt, worldWidth, worldHeight)
 	p.time += dt
 	if p.time > 5 && p.state != bombStateBoom {
 		p.state = bombStateBoom

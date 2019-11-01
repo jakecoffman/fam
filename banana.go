@@ -19,10 +19,11 @@ func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.S
 		Object: &eng.Object{},
 		Texture: sprite,
 	}
-	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
+	const bananaMass = 10
+	p.Body = cp.NewBody(bananaMass, cp.MomentForCircle(bananaMass, radius, radius, cp.Vector{0, 0}))
 	p.Shape = cp.NewCircle(p.Body, radius, cp.Vector{0, 0})
 	p.Shape.SetElasticity(0)
-	p.Shape.SetFriction(1)
+	p.Shape.SetFriction(10)
 
 	// for consummation
 	p.Shape.SetCollisionType(collisionBanana)
@@ -36,7 +37,7 @@ func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.S
 }
 
 func (p *Banana) Update(g *Game, dt float64) {
-	p.Object.Update(dt)
+	p.Object.Update(dt, worldWidth, worldHeight)
 }
 
 func (p *Banana) Draw(renderer *eng.SpriteRenderer, alpha float64) {

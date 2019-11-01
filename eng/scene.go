@@ -43,7 +43,7 @@ func Run(scene Scene) {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	const dt = 1. / 60.
+	const dt = 1. / 180.
 	currentTime := glfw.GetTime()
 	accumulator := 0.0
 

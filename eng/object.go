@@ -19,9 +19,27 @@ type Object struct {
 	lastPosition *cp.Vector
 }
 
-func (p *Object) Update(dt float64) {
+func (p *Object) Update(dt, worldWidth, worldHeight float64) {
 	pos := p.Position()
 	p.lastPosition = &pos
+
+	if pos.X < -5 {
+		pos.X = worldWidth
+	}
+	if pos.X > worldWidth + 5 {
+		pos.X = 0
+	}
+	if pos.Y < -5 {
+		pos.Y = worldHeight
+	}
+	if pos.Y > worldHeight + 5 {
+		pos.Y = 0
+	}
+	if !pos.Equal(p.Position()) {
+		p.SetPosition(pos)
+		// prevent smoothing
+		p.lastPosition = &pos
+	}
 }
 
 func (p *Object) SmoothPos(alpha float64) mgl32.Vec2 {

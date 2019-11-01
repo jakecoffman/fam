@@ -1,18 +1,20 @@
 package fam
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/jakecoffman/cp"
-	"github.com/jakecoffman/fam/eng"
 	"log"
 	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
 )
 
 var GrabbableMaskBit uint = 1 << 31
@@ -40,6 +42,8 @@ const (
 	collisionBanana
 	collisionBomb
 )
+
+const wallWidth = 10
 
 type Game struct {
 	state      int
@@ -75,6 +79,8 @@ type Game struct {
 	TextRenderer      *eng.TextRenderer
 
 	shouldRenderCp bool
+
+	level string
 }
 
 const (
@@ -143,7 +149,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			log.Println("Joystick connected", joy)
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
+			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
 			g.Players[i].Color = eng.NextColor()
 			g.Players[i].Joystick = glfw.Joystick(joy)
 		} else {
@@ -157,7 +163,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 		if !glfw.JoystickPresent(joy) {
 			break
 		}
-		g.Players = append(g.Players, NewPlayer(center, playerRadius, g.Space))
+		g.Players = append(g.Players, NewPlayer(center, playerRadius, g))
 		g.Players[i].Color = eng.NextColor()
 		g.Players[i].Joystick = joy
 	}
@@ -187,10 +193,10 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			g.fullscreen = !g.fullscreen
 			openGlWindow.SetFullscreen(g.fullscreen)
 		}
-		if g.Keys[glfw.KeySpace] {
+		if g.Keys[glfw.KeyEnter] {
 			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g.Space))
+			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
 			g.Players[i].Color = eng.NextColor()
 			g.Players[i].Joystick = glfw.Joystick(-1)
 		}
@@ -208,12 +214,12 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 		if g.state != stateActive {
 			return
 		}
+		// give the mouse click a little radius to make it easier to click small shapes.
+		const clickRadius = 5
+
 		if button == glfw.MouseButton1 {
 			if action == glfw.Press {
-				// give the mouse click a little radius to make it easier to click small shapes.
-				radius := 5.0
-
-				info := g.Space.PointQueryNearest(g.mouse, radius, NotGrabbableFilter)
+				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
 
 				if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
 					var nearest cp.Vector
@@ -231,9 +237,9 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 				} else {
 					leftDown := g.mouse.Clone()
 					g.leftDown = &leftDown
-					seg := cp.NewSegment(g.Space.StaticBody, *g.leftDown, g.mouse, 10)
+					seg := cp.NewSegment(g.Space.StaticBody, *g.leftDown, g.mouse, wallWidth)
 					seg.SetElasticity(1)
-					seg.SetFriction(1)
+					seg.SetFriction(wallFriction)
 					g.drawingWallShape = seg.Class.(*cp.Segment)
 					g.Walls = append(g.Walls, g.drawingWallShape)
 				}
@@ -257,6 +263,23 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 				g.rightDown = &rightDown
 			} else {
 				g.rightDown = nil
+
+				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+
+				if info.Shape != nil {
+					if segment, ok := info.Shape.Class.(*cp.Segment); ok {
+						for i, w := range g.Walls {
+							if segment == w {
+								g.Walls = append(g.Walls[:i], g.Walls[i+1:]...)
+								g.Space.AddPostStepCallback(func(space *cp.Space, key interface{}, data interface{}) {
+									space.RemoveShape(w.Shape)
+									space.RemoveBody(w.Body())
+								}, nil, nil)
+								break
+							}
+						}
+					}
+				}
 			}
 		}
 	})
@@ -328,7 +351,7 @@ func (g *Game) Render(alpha float64) {
 	//}
 
 	if len(g.Players) == 0 {
-		g.TextRenderer.Print("Connect controllers or press SPACE to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
+		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 
 	//g.SpriteRenderer.DrawSprite(g.Texture("banana"), V(g.mouse), mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
@@ -353,7 +376,8 @@ func (g *Game) unpause() {
 
 func (g *Game) reset() {
 	g.Space = cp.NewSpace()
-	g.Space.SetGravity(cp.Vector{0, 1_000})
+	g.Space.Iterations = 10
+	g.Space.SetGravity(cp.Vector{0, Gravity})
 
 	bananaCollisionHandler := g.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
 	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
@@ -364,29 +388,17 @@ func (g *Game) reset() {
 
 	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
-	const borderWidth = 10
-	sides := []cp.Vector{
-		{0 - borderWidth, 0 - borderWidth}, {worldWidth + borderWidth, 0 - borderWidth},
-		{worldWidth + borderWidth, 0 + borderWidth}, {worldWidth + borderWidth, worldHeight + borderWidth},
-		{worldWidth + borderWidth, worldHeight + borderWidth}, {0 + borderWidth, worldHeight + borderWidth},
-		{0 - borderWidth, worldHeight - borderWidth}, {0 - borderWidth, 0 - borderWidth},
-	}
-
-	for i := 0; i < len(sides); i += 2 {
-		var seg *cp.Shape
-		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, sides[i], sides[i+1], borderWidth))
-		seg.SetElasticity(1)
-		seg.SetFriction(1)
-		seg.SetFilter(NotGrabbableFilter)
+	// load the initial level
+	if err := g.loadLevel("assets/levels/initial.json"); err != nil {
+		panic(err)
 	}
 
 	for _, p := range g.Players {
 		pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-		p.Reset(pos, playerRadius, g.Space)
+		p.Reset(pos, playerRadius, g)
 	}
 	g.Bananas = []*Banana{}
 	g.Bombs = []*Bomb{}
-	g.Walls = []*cp.Segment{}
 }
 
 func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {
@@ -397,4 +409,51 @@ func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {
 	}
 
 	return cp.Vector{float64(obj.X()), float64(obj.Y())}
+}
+
+func (g *Game) saveLevel(filename string) {
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	type entry struct {
+		A, B cp.Vector
+	}
+	var data []entry
+	for _, w := range g.Walls {
+		data = append(data, entry{w.A(), w.B()})
+	}
+	if err = json.NewEncoder(file).Encode(data); err != nil {
+		log.Println(err)
+	}
+}
+
+const wallFriction = 100
+
+func (g *Game) loadLevel(name string) error {
+	file, err := os.Open(name)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	type entry struct {
+		A, B cp.Vector
+	}
+	var data []entry
+	if err = json.NewDecoder(file).Decode(&data); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	g.Walls = []*cp.Segment{}
+	for _, w := range data {
+		var seg *cp.Shape
+		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, w.A, w.B, wallWidth))
+		seg.SetElasticity(1)
+		seg.SetFriction(wallFriction)
+		g.Walls = append(g.Walls, seg.Class.(*cp.Segment))
+	}
+
+	return nil
 }
