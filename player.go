@@ -58,7 +58,9 @@ func (p *Player) Update(g *Game, dt float64) {
 	var jumpState bool
 	if p.Joystick > -1 {
 		buttonBytes := glfw.GetJoystickButtons(p.Joystick)
-		jumpState = buttonBytes[0] == 1
+		if len(buttonBytes) > 0 {
+			jumpState = glfw.Action(buttonBytes[0]) == glfw.Press
+		}
 	} else {
 		jumpState = g.Keys[glfw.KeySpace]
 	}
@@ -111,9 +113,9 @@ func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64,
 			}
 
 			buttonBytes := glfw.GetJoystickButtons(p.Joystick)
-			// TODO not sure if this is right
-			jumpState = glfw.Action(buttonBytes[0]) == glfw.Release
-
+			if len(buttonBytes) > 0 {
+				jumpState = glfw.Action(buttonBytes[0]) == glfw.Press
+			}
 			x = math.Round(float64(axes[0])*joystickSensitivity) / joystickSensitivity
 		} else {
 			if g.Keys[glfw.KeyA] || g.Keys[glfw.KeyLeft] {
