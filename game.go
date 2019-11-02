@@ -41,9 +41,8 @@ const (
 	collisionPlayer
 	collisionBanana
 	collisionBomb
+	collisionWall
 )
-
-const wallWidth = 10
 
 type Game struct {
 	state      int
@@ -63,14 +62,14 @@ type Game struct {
 	leftDown  *cp.Vector
 	rightDown *cp.Vector
 
-	drawingWallShape *cp.Segment
+	drawingWallShape *Wall
 
 	Space *cp.Space
 
 	Players []*Player
 	Bananas []*Banana
 	Bombs   []*Bomb
-	Walls   []*cp.Segment
+	Walls   []*Wall
 
 	*eng.ResourceManager
 	ParticleGenerator *eng.ParticleGenerator
@@ -237,10 +236,8 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 				} else {
 					leftDown := g.mouse.Clone()
 					g.leftDown = &leftDown
-					seg := cp.NewSegment(g.Space.StaticBody, *g.leftDown, g.mouse, wallWidth)
-					seg.SetElasticity(1)
-					seg.SetFriction(wallFriction)
-					g.drawingWallShape = seg.Class.(*cp.Segment)
+					wall := NewWall(g, *g.leftDown, g.mouse)
+					g.drawingWallShape = wall
 					g.Walls = append(g.Walls, g.drawingWallShape)
 				}
 				return
@@ -269,7 +266,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 				if info.Shape != nil {
 					if segment, ok := info.Shape.Class.(*cp.Segment); ok {
 						for i, w := range g.Walls {
-							if segment == w {
+							if segment == w.Segment {
 								g.Walls = append(g.Walls[:i], g.Walls[i+1:]...)
 								g.Space.AddPostStepCallback(func(space *cp.Space, key interface{}, data interface{}) {
 									space.RemoveShape(w.Shape)
@@ -386,6 +383,8 @@ func (g *Game) reset() {
 	bombCollisionHandler := g.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
 	bombCollisionHandler.PreSolveFunc = BombPreSolve
 
+	g.Space.NewWildcardCollisionHandler(collisionWall).PreSolveFunc = WallPreSolve
+
 	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
 	// load the initial level
@@ -429,8 +428,6 @@ func (g *Game) saveLevel(filename string) {
 	}
 }
 
-const wallFriction = 100
-
 func (g *Game) loadLevel(name string) error {
 	file, err := os.Open(name)
 	if err != nil {
@@ -446,13 +443,11 @@ func (g *Game) loadLevel(name string) error {
 		return err
 	}
 
-	g.Walls = []*cp.Segment{}
+	g.Walls = []*Wall{}
 	for _, w := range data {
-		var seg *cp.Shape
-		seg = g.Space.AddShape(cp.NewSegment(g.Space.StaticBody, w.A, w.B, wallWidth))
-		seg.SetElasticity(1)
-		seg.SetFriction(wallFriction)
-		g.Walls = append(g.Walls, seg.Class.(*cp.Segment))
+		wall := NewWall(g, w.A, w.B)
+		g.Space.AddShape(wall.Segment.Shape)
+		g.Walls = append(g.Walls, wall)
 	}
 
 	return nil
