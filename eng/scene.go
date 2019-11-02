@@ -74,7 +74,7 @@ func Run(scene Scene) {
 			accumulator -= dt
 		}
 
-		gl.ClearColor(.3, .3, .3, 1)
+		gl.ClearColor(0, 0, 0, 1)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
 		alpha := accumulator / dt

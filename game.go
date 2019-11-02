@@ -184,7 +184,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			}
 		}
 		if g.Keys[glfw.KeyE] {
-			g.Bananas = append(g.Bananas, NewBanana(g.mouse, 10, g.Texture("banana"), g.Space))
+			g.Bananas = append(g.Bananas, NewBanana(g.mouse, 20, g.Texture("banana"), g.Space))
 		}
 		if g.Keys[glfw.KeyQ] {
 			g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))

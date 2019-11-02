@@ -44,8 +44,6 @@ func init() {
 }
 
 var Colors = []mgl32.Vec3{
-	White,
-	Black,
 	Grey,
 	Magenta,
 	Purple,
