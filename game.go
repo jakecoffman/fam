@@ -327,17 +327,9 @@ func (g *Game) Render(alpha float64) {
 	}
 
 	//if g.state == stateActive {
-	//g.SpriteRenderer.DrawSprite(g.Texture("background"), Vec2(0, 0), mgl32.Vec2{float32(g.window.Width), float32(g.window.Height)}, 0, DefaultColor)
+	g.SpriteRenderer.DrawSprite(g.Texture("background"), mgl32.Vec2{worldWidth/2, worldHeight/2}, mgl32.Vec2{worldWidth, worldHeight}, 0, eng.White)
 	//g.ParticleGenerator.Draw()
-	for i := range g.Bananas {
-		g.Bananas[i].Draw(g.SpriteRenderer, alpha)
-	}
-	for i := range g.Bombs {
-		g.Bombs[i].Draw(g, alpha)
-	}
-	for i := range g.Players {
-		g.Players[i].Draw(g, alpha)
-	}
+
 	g.CPRenderer.ClearRenderer()
 	for _, wall := range g.Walls {
 		g.CPRenderer.DrawFatSegment(wall.A(), wall.B(), wall.Radius(), eng.DefaultOutline, eng.DefaultFill)
@@ -352,6 +344,16 @@ func (g *Game) Render(alpha float64) {
 	}
 
 	//g.SpriteRenderer.DrawSprite(g.Texture("banana"), V(g.mouse), mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
+
+	for i := range g.Bananas {
+		g.Bananas[i].Draw(g.SpriteRenderer, alpha)
+	}
+	for i := range g.Bombs {
+		g.Bombs[i].Draw(g, alpha)
+	}
+	for i := range g.Players {
+		g.Players[i].Draw(g, alpha)
+	}
 
 	if g.state == statePause {
 		g.gui.Render()
