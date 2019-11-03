@@ -72,6 +72,7 @@ type Game struct {
 	Walls   []*Wall
 
 	*eng.ResourceManager
+
 	ParticleGenerator *eng.ParticleGenerator
 	SpriteRenderer    *eng.SpriteRenderer
 	CPRenderer        *eng.CPRenderer
@@ -309,8 +310,6 @@ func (g *Game) Update(dt float64) {
 	}
 
 	g.Space.Step(dt)
-	//ball := g.Player
-	//g.ParticleGenerator.Update(dt, ball.Position(), ball.Velocity(), 2, mgl32.Vec2{g.Player.Radius() / 2, g.Player.Radius() / 2})
 }
 
 func (g *Game) Render(alpha float64) {
@@ -322,22 +321,19 @@ func (g *Game) Render(alpha float64) {
 		log.Printf("update viewport %#v\n", g.window)
 	}
 
-	if g.shouldRenderCp {
-		g.CPRenderer.DrawSpace(g.Space)
-	}
-
-	//if g.state == stateActive {
 	g.SpriteRenderer.DrawSprite(g.Texture("background"), mgl32.Vec2{worldWidth/2, worldHeight/2}, mgl32.Vec2{worldWidth, worldHeight}, 0, eng.White)
-	//g.ParticleGenerator.Draw()
 
-	g.CPRenderer.ClearRenderer()
-	for _, wall := range g.Walls {
-		g.CPRenderer.DrawFatSegment(wall.A(), wall.B(), wall.Radius(), eng.DefaultOutline, eng.DefaultFill)
+	{
+		g.CPRenderer.Clear()
+		if g.shouldRenderCp {
+			g.CPRenderer.DrawSpace(g.Space)
+		} else {
+			for i := range g.Walls {
+				g.Walls[i].Draw(g, alpha)
+			}
+		}
+		g.CPRenderer.Flush()
 	}
-	if len(g.Walls) > 0 {
-		g.CPRenderer.FlushRenderer()
-	}
-	//}
 
 	if len(g.Players) == 0 {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)

@@ -63,12 +63,9 @@ type FColor struct {
 }
 
 func (cpr *CPRenderer) DrawSpace(space *cp.Space) {
-	cpr.ClearRenderer()
 	space.EachShape(func(obj *cp.Shape) {
 		cpr.DrawShape(obj, DefaultOutline, DefaultFill)
 	})
-	cpr.FlushRenderer()
-
 	// TODO
 	//space.EachConstraint(func(constraint *cp.Constraint) {
 	//	cp.DrawConstraint(constraint, nil)
@@ -325,7 +322,10 @@ func (cpr *CPRenderer) DrawBB(bb cp.BB, outline FColor) {
 	cpr.DrawPolygon(4, verts, 0, outline, FColor{})
 }
 
-func (cpr *CPRenderer) FlushRenderer() {
+func (cpr *CPRenderer) Flush() {
+	if len(cpr.triangles) == 0 {
+		return
+	}
 	gl.BindBuffer(gl.ARRAY_BUFFER, cpr.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cpr.triangles)*(48*3), gl.Ptr(cpr.triangles), gl.STREAM_DRAW)
 
@@ -337,6 +337,6 @@ func (cpr *CPRenderer) FlushRenderer() {
 	CheckGLErrors()
 }
 
-func (cpr *CPRenderer) ClearRenderer() {
+func (cpr *CPRenderer) Clear() {
 	cpr.triangles = cpr.triangles[:0]
 }

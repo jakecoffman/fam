@@ -1,6 +1,9 @@
 package fam
 
-import "github.com/jakecoffman/cp"
+import (
+	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/fam/eng"
+)
 
 type Wall struct {
 	*cp.Segment
@@ -29,4 +32,8 @@ func WallPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	}
 
 	return true
+}
+
+func (w *Wall) Draw(g *Game, alpha float64) {
+	g.CPRenderer.DrawFatSegment(w.A(), w.B(), w.Radius(), eng.DefaultOutline, eng.DefaultFill)
 }

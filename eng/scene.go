@@ -15,6 +15,11 @@ type Scene interface {
 	Close()
 }
 
+type Renderer interface {
+	Clear()
+	Flush()
+}
+
 func Run(scene Scene) {
 	runtime.LockOSThread()
 
