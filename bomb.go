@@ -57,6 +57,7 @@ func (s *BombSystem) Add() *eng.Object {
 	p.Object = eng.NewObject(p)
 
 	p.state = bombStateOk
+	p.time = 0
 	const radius = 20
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	// the bomb body is smaller because of the wick, so make it a little smaller

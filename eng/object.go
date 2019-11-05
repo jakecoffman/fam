@@ -49,7 +49,7 @@ func (p *Object) Update(dt, worldWidth, worldHeight float64) {
 	if !pos.Equal(p.Position()) {
 		p.SetPosition(pos)
 		// prevent smoothing
-		p.lastPosition = &pos
+		p.lastPosition = nil
 	}
 }
 

@@ -121,7 +121,9 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
 			_, index := game.Bananas.Get(bid)
-			game.Bananas.Remove(index)
+			if index >= 0 {
+				game.Bananas.Remove(index)
+			}
 		}, nil, nil)
 
 		return false
