@@ -5,18 +5,39 @@ import (
 	"github.com/jakecoffman/cp"
 )
 
-var objectId int
+type System interface {
+	Add() *Object
+	Get(id EntityId) (ptr *Object, index int)
+	Remove(index int)
+	Reset()
 
-func GetObjectId() int {
+	Update(dt float64)
+	Draw(alpha float64)
+}
+
+type EntityId int
+
+var objectId EntityId
+
+func GetObjectId() EntityId {
 	objectId++
 	return objectId
 }
 
 type Object struct {
+	ID EntityId
+	Class interface{}
 	*cp.Body
 	*cp.Shape
 
 	lastPosition *cp.Vector
+}
+
+func NewObject(class interface{}) *Object {
+	return &Object{
+		ID: GetObjectId(),
+		Class: class,
+	}
 }
 
 func (p *Object) Update(dt, worldWidth, worldHeight float64) {

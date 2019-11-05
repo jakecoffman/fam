@@ -7,8 +7,6 @@ import (
 )
 
 type Bomb struct {
-	radius float64
-
 	*eng.Object
 	Circle *cp.Circle
 
@@ -30,10 +28,9 @@ const (
 )
 
 func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
-	p := &Bomb{
-		Object: &eng.Object{},
-		state:  bombStateOk,
-	}
+	p := &Bomb{}
+	p.Object = eng.NewObject(p)
+	p.state = bombStateOk
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	// the bomb body is smaller because of the wick, so make it a little smaller
 	p.Shape = cp.NewCircle(p.Body, radius, cp.Vector{-radius, radius})
