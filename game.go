@@ -68,7 +68,7 @@ type Game struct {
 
 	Players []*Player
 	Bananas eng.System
-	Bombs   []*Bomb
+	Bombs   eng.System
 	Walls   []*Wall
 
 	*eng.ResourceManager
@@ -138,6 +138,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	g.ParticleGenerator = eng.NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 	g.Bananas = NewBananaSystem(g)
+	g.Bombs = NewBombSystem(g)
 
 	g.reset()
 
@@ -188,7 +189,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			g.Bananas.Add().SetPosition(g.mouse)
 		}
 		if g.Keys[glfw.KeyQ] {
-			g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
+			g.Bombs.Add().SetPosition(g.mouse)
 		}
 		if g.Keys[glfw.KeyF] {
 			g.fullscreen = !g.fullscreen
@@ -300,9 +301,7 @@ func (g *Game) Update(dt float64) {
 		g.drawingWallShape = nil
 	}
 
-	for i := range g.Bombs {
-		g.Bombs[i].Update(g, dt)
-	}
+	g.Bombs.Update(dt)
 	g.Bananas.Update(dt)
 	for i := range g.Players {
 		g.Players[i].Update(g, dt)
@@ -341,9 +340,7 @@ func (g *Game) Render(alpha float64) {
 	//g.SpriteRenderer.DrawSprite(g.Texture("banana"), V(g.mouse), mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
 
 	g.Bananas.Draw(alpha)
-	for i := range g.Bombs {
-		g.Bombs[i].Draw(g, alpha)
-	}
+	g.Bombs.Draw(alpha)
 	for i := range g.Players {
 		g.Players[i].Draw(g, alpha)
 	}
@@ -392,7 +389,7 @@ func (g *Game) reset() {
 		p.Reset(pos, playerRadius, g)
 	}
 	g.Bananas.Reset()
-	g.Bombs = []*Bomb{}
+	g.Bombs.Reset()
 }
 
 func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {

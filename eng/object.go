@@ -5,16 +5,6 @@ import (
 	"github.com/jakecoffman/cp"
 )
 
-type System interface {
-	Add() *Object
-	Get(id EntityId) (ptr *Object, index int)
-	Remove(index int)
-	Reset()
-
-	Update(dt float64)
-	Draw(alpha float64)
-}
-
 type EntityId int
 
 var objectId EntityId

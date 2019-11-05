@@ -4,7 +4,33 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
+	"log"
 )
+
+const MaxBombs = 100
+
+type BombSystem struct {
+	active   int
+	game     *Game
+	bombs    [MaxBombs]Bomb
+	renderer *eng.SpriteRenderer
+
+	texture, powTexture *eng.Texture2D
+}
+
+func NewBombSystem(g *Game) *BombSystem {
+	const (
+		bombTexture    = "bomb"
+		bombPowTexture = "pow"
+	)
+	return &BombSystem{
+		game:       g,
+		texture:    g.Texture(bombTexture),
+		powTexture: g.Texture(bombPowTexture),
+		bombs:      [MaxBombs]Bomb{},
+		renderer:   g.SpriteRenderer,
+	}
+}
 
 type Bomb struct {
 	*eng.Object
@@ -22,15 +48,16 @@ const (
 	bombStateGone
 )
 
-const (
-	bombTexture    = "bomb"
-	bombPowTexture = "pow"
-)
-
-func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
-	p := &Bomb{}
+func (s *BombSystem) Add() *eng.Object {
+	if s.active >= MaxBombs {
+		return s.bombs[s.active-1].Object
+	}
+	p := &s.bombs[s.active]
+	s.active++
 	p.Object = eng.NewObject(p)
+
 	p.state = bombStateOk
+	const radius = 20
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	// the bomb body is smaller because of the wick, so make it a little smaller
 	p.Shape = cp.NewCircle(p.Body, radius, cp.Vector{-radius, radius})
@@ -42,15 +69,83 @@ func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
 	p.Shape.UserData = p
 
 	p.Circle = p.Shape.Class.(*cp.Circle)
-	p.Body.SetPosition(pos)
-	space.AddBody(p.Body)
-	space.AddShape(p.Shape)
-	return p
+	s.game.Space.AddBody(p.Body)
+	s.game.Space.AddShape(p.Shape)
+	return p.Object
+}
+
+func (s *BombSystem) Get(id eng.EntityId) (ptr *eng.Object, index int) {
+	for i := 0; i < s.active; i++ {
+		if s.bombs[i].ID == id {
+			return s.bombs[i].Object, i
+		}
+	}
+	return nil, -1
+}
+
+func (s *BombSystem) Remove(index int) {
+	if index >= s.active {
+		log.Panic("Removing bomb already removed")
+	}
+	s.active--
+	s.bombs[s.active], s.bombs[index] = s.bombs[index], s.bombs[s.active]
+	bomb := &s.bombs[s.active]
+	bomb.Shape.UserData = nil
+	s.game.Space.RemoveShape(bomb.Shape)
+	s.game.Space.RemoveBody(bomb.Body)
+	bomb.Body.RemoveShape(bomb.Shape)
+	bomb.Shape = nil
+	bomb.Body = nil
+}
+
+func (s *BombSystem) Reset() {
+	for i := 0; i < s.active; i++ {
+		s.game.Space.RemoveShape(s.bombs[i].Shape)
+		s.game.Space.RemoveBody(s.bombs[i].Body)
+	}
+	s.active = 0
+}
+
+func (s *BombSystem) Update(dt float64) {
+	for i := 0; i < s.active; i++ {
+		s.bombs[i].Update(dt)
+		if s.bombs[i].state == bombStateGone {
+			// avoid mutating array in for loop
+			defer s.Remove(i)
+		}
+	}
+}
+
+func (s *BombSystem) Draw(alpha float64) {
+	for i := 0; i < s.active; i++ {
+		p := s.bombs[i]
+		if p.state == bombStateGone {
+			return
+		}
+
+		color := mgl32.Vec3{1, 1, 1}
+		var texture *eng.Texture2D
+
+		switch p.state {
+		case bombStateOk:
+			texture = s.texture
+			if int(p.time)%2 != 0 {
+				// flash of grey representing bomb ticking ala Zelda bombs
+				color = mgl32.Vec3{.5, .5, .5}
+			}
+		case bombStateBoom:
+			texture = s.powTexture
+		default:
+			return
+		}
+
+		s.renderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
+	}
 }
 
 const explosionSizeIncrease = 10
 
-func (p *Bomb) Update(g *Game, dt float64) {
+func (p *Bomb) Update(dt float64) {
 	if p.state == bombStateGone {
 		return
 	}
@@ -65,33 +160,7 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	}
 	if p.time > 6 {
 		p.state = bombStateGone
-		g.Space.RemoveShape(p.Shape)
-		g.Space.RemoveBody(p.Body)
 	}
-}
-
-func (p *Bomb) Draw(g *Game, alpha float64) {
-	if p.state == bombStateGone {
-		return
-	}
-
-	color := mgl32.Vec3{1, 1, 1}
-	var texture *eng.Texture2D
-
-	switch p.state {
-	case bombStateOk:
-		texture = g.Texture(bombTexture)
-		if int(p.time)%2 != 0 {
-			// flash of grey representing bomb ticking ala Zelda bombs
-			color = mgl32.Vec3{.5, .5, .5}
-		}
-	case bombStateBoom:
-		texture = g.Texture(bombPowTexture)
-	default:
-		return
-	}
-
-	g.SpriteRenderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
 }
 
 func BombPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {

@@ -51,7 +51,7 @@ func (s *BananaSystem) Draw(alpha float64) {
 
 func (s *BananaSystem) Add() *eng.Object {
 	if s.active >= MaxBananas {
-		return nil
+		return s.bananas[s.active-1].Object
 	}
 	p := &s.bananas[s.active]
 	s.active++
@@ -98,10 +98,6 @@ func (s *BananaSystem) Remove(index int) {
 	banana.Body.RemoveShape(banana.Shape)
 	banana.Shape = nil
 	banana.Body = nil
-}
-
-func swap(a, b *Banana) {
-	*a, *b = *b, *a
 }
 
 func (s *BananaSystem) Reset() {
