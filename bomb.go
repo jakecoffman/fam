@@ -109,9 +109,20 @@ func (s *BombSystem) Reset() {
 
 func (s *BombSystem) Update(dt float64) {
 	for i := 0; i < s.active; i++ {
-		s.bombs[i].Update(dt)
-		if s.bombs[i].state == bombStateGone {
-			// avoid mutating array in for loop
+		p := &s.bombs[i]
+		p.Object.Update(dt, worldWidth, worldHeight)
+		p.time += dt
+
+		const explosionSizeIncrease = 10
+		if p.time > 5 && p.state != bombStateBoom {
+			p.state = bombStateBoom
+			p.Circle.SetRadius(p.Circle.Radius() * explosionSizeIncrease)
+		}
+		if p.time > 5.2 && p.state == bombStateBoom {
+			p.Circle.SetRadius(p.Circle.Radius() / explosionSizeIncrease)
+		}
+		if p.time > 6 {
+			p.state = bombStateGone
 			defer s.Remove(i)
 		}
 	}
@@ -130,7 +141,7 @@ func (s *BombSystem) Draw(alpha float64) {
 		switch p.state {
 		case bombStateOk:
 			texture = s.texture
-			if int(p.time)%2 != 0 {
+			if int(p.time*3)%2 != 0 {
 				// flash of grey representing bomb ticking ala Zelda bombs
 				color = mgl32.Vec3{.5, .5, .5}
 			}
@@ -141,26 +152,6 @@ func (s *BombSystem) Draw(alpha float64) {
 		}
 
 		s.renderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
-	}
-}
-
-const explosionSizeIncrease = 10
-
-func (p *Bomb) Update(dt float64) {
-	if p.state == bombStateGone {
-		return
-	}
-	p.Object.Update(dt, worldWidth, worldHeight)
-	p.time += dt
-	if p.time > 5 && p.state != bombStateBoom {
-		p.state = bombStateBoom
-		p.Circle.SetRadius(p.Circle.Radius() * explosionSizeIncrease)
-	}
-	if p.time > 5.2 && p.state == bombStateBoom {
-		p.Circle.SetRadius(p.Circle.Radius() / explosionSizeIncrease)
-	}
-	if p.time > 6 {
-		p.state = bombStateGone
 	}
 }
 

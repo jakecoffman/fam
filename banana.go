@@ -23,10 +23,6 @@ type Banana struct {
 	*eng.Object
 }
 
-func (p *Banana) Update(dt float64) {
-	p.Object.Update(dt, worldWidth, worldHeight)
-}
-
 func NewBananaSystem(g *Game) *BananaSystem {
 	return &BananaSystem{
 		game:    g,
@@ -38,7 +34,7 @@ func NewBananaSystem(g *Game) *BananaSystem {
 
 func (s *BananaSystem) Update(dt float64) {
 	for i := 0; i < s.active; i++ {
-		s.bananas[i].Update(dt)
+		s.bananas[i].Update(dt, worldWidth, worldHeight)
 	}
 }
 
