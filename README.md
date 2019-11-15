@@ -6,11 +6,11 @@ a simple game to play with the kids
 
 ### Windows
 
-TODO
+Install the gcc toolchain somehow, MinGW or Cygwin.
 
 ### Mac
 
-TODO
+xcode or something
 
 ### Ubuntu
 
@@ -30,4 +30,4 @@ sudo apt install xorg-dev libgl1-mesa-dev
 - bombs deflate you
 - kid friendly, no death or shooting
 - keyboard can spawn objects and drag things around
-- works on windows, mac, and probably linux
+- works on windows, mac, and linux
