@@ -6,7 +6,7 @@ a simple game to play with the kids
 
 ### Windows
 
-install the gcc toolchain somehow. I recommend TDM-GCC-64
+install the gcc toolchain somehow. I recommend TDM-GCC-64.
 
 ### Mac
 
