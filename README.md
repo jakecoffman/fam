@@ -6,7 +6,7 @@ a simple game to play with the kids
 
 ### Windows
 
-Install the gcc toolchain somehow, MinGW or Cygwin.
+Install the gcc toolchain via mingw-w64 or Cygwin.
 
 ### Mac
 
