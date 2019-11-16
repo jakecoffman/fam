@@ -18,12 +18,7 @@ xcode or something
 sudo apt install xorg-dev libgl1-mesa-dev
 ```
 
-## screenshot
-
-![Screenshot1](/ss01.png?raw=true "Screenshot 1")
-
 ## features
-
 - up to 16 (!) controllers supported
 - imgui powered pause menu (hit esc)
 - bananas make you grow bigger
@@ -31,3 +26,13 @@ sudo apt install xorg-dev libgl1-mesa-dev
 - kid friendly, no death or shooting
 - keyboard can spawn objects and drag things around
 - works on windows, mac, and linux
+
+## screenshots
+
+### version 2
+
+![Screenshot1](/ss02.gif?raw=true "Screenshot 1")
+
+### version 1
+
+![Screenshot1](/ss01.png?raw=true "Screenshot 1")
