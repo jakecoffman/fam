@@ -4,18 +4,12 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
-	"log"
-)
-
-const (
-	MaxBananas = 100
 )
 
 type BananaSystem struct {
-	active  int
-	texture *eng.Texture2D
-	game    *Game
-	bananas [MaxBananas]Banana
+	texture  *eng.Texture2D
+	game     *Game
+	bananas  map[eng.EntityId]*Banana
 	renderer *eng.SpriteRenderer
 }
 
@@ -25,36 +19,26 @@ type Banana struct {
 
 func NewBananaSystem(g *Game) *BananaSystem {
 	return &BananaSystem{
-		game:    g,
-		texture: g.Texture("banana"),
-		bananas: [100]Banana{},
+		game:     g,
+		texture:  g.Texture("banana"),
+		bananas:  map[eng.EntityId]*Banana{},
 		renderer: g.SpriteRenderer,
 	}
 }
 
-func (s *BananaSystem) Update(dt float64) {
-	for i := 0; i < s.active; i++ {
-		s.bananas[i].Update(dt, worldWidth, worldHeight)
-	}
-}
-
 func (s *BananaSystem) Draw(alpha float64) {
-	for i := 0; i < s.active; i++ {
-		p := s.bananas[i]
+	for _, p := range s.bananas {
 		s.renderer.DrawSprite(s.texture, p.SmoothPos(alpha), p.Size(), p.Angle(), mgl32.Vec3{1, 1, 1})
 	}
 }
 
 func (s *BananaSystem) Add() *eng.Object {
-	if s.active >= MaxBananas {
-		return s.bananas[s.active-1].Object
-	}
-	p := &s.bananas[s.active]
-	s.active++
-	p.Object = eng.NewObject(p)
+	p := &Banana{}
+	p.Object = s.game.Objects.Add(p)
+	s.bananas[p.ID] = p
 
 	const (
-		bananaMass = 10
+		bananaMass   = 10
 		bananaRadius = 20
 	)
 	p.Body = cp.NewBody(bananaMass, cp.MomentForCircle(bananaMass, bananaRadius, bananaRadius, cp.Vector{0, 0}))
@@ -72,36 +56,16 @@ func (s *BananaSystem) Add() *eng.Object {
 	return p.Object
 }
 
-func (s *BananaSystem) Get(id eng.EntityId) (*eng.Object, int) {
-	for i := 0; i < s.active; i++ {
-		if s.bananas[i].ID == id {
-			return s.bananas[i].Object, i
-		}
-	}
-	return nil, -1
-}
-
-func (s *BananaSystem) Remove(index int) {
-	if index >= s.active {
-		log.Panic("Removing banana already removed")
-	}
-	s.active--
-	s.bananas[s.active], s.bananas[index] = s.bananas[index], s.bananas[s.active]
-	banana := &s.bananas[s.active]
-	banana.Shape.UserData = nil
-	s.game.Space.RemoveShape(banana.Shape)
-	s.game.Space.RemoveBody(banana.Body)
-	banana.Body.RemoveShape(banana.Shape)
-	banana.Shape = nil
-	banana.Body = nil
+func (s *BananaSystem) Remove(id eng.EntityId) {
+	s.game.Objects.Remove(id)
+	delete(s.bananas, id)
 }
 
 func (s *BananaSystem) Reset() {
-	for i := 0; i < s.active; i++ {
-		s.game.Space.RemoveShape(s.bananas[i].Shape)
-		s.game.Space.RemoveBody(s.bananas[i].Body)
-	}
-	s.active = 0
+	s.bananas = map[eng.EntityId]*Banana{}
+	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
+	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
+	bananaCollisionHandler.UserData = s.game
 }
 
 func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
@@ -116,10 +80,7 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 		player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
-			_, index := game.Bananas.Get(bid)
-			if index >= 0 {
-				game.Bananas.Remove(index)
-			}
+			game.Bananas.Remove(bid)
 		}, nil, nil)
 
 		return false

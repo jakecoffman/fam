@@ -9,6 +9,11 @@ import (
 	"github.com/jakecoffman/fam/eng"
 )
 
+type PlayerSystem struct {
+	game *Game
+	players map[eng.EntityId]*Player
+}
+
 type Player struct {
 	Color   mgl32.Vec3
 
@@ -17,27 +22,35 @@ type Player struct {
 
 	Joystick glfw.Joystick
 
-	lastPosition *cp.Vector
-
 	remainingBoost float64
 	grounded, lastJumpState bool
 }
 
-func NewPlayer(pos cp.Vector, radius float64, g *Game) *Player {
-	p := &Player{
-		Object: &eng.Object{},
-		Color:   mgl32.Vec3{1, 1, 1},
+func NewPlayerSystem(game *Game) *PlayerSystem {
+	return &PlayerSystem{
+		game: game,
+		players: map[eng.EntityId]*Player{},
 	}
-	p.Reset(pos, radius, g)
+}
 
+const playerRadius = 25.0
+
+func (s *PlayerSystem) Add(pos cp.Vector, color mgl32.Vec3, joystick glfw.Joystick) *Player {
+	p := &Player{
+		Color: color,
+		Joystick: joystick,
+	}
+	p.Object = s.game.Objects.Add(s.game.Space)
+	s.players[p.ID] = p
+	p.Reset(pos, s.game)
 	return p
 }
 
-func (p *Player) Reset(pos cp.Vector, radius float64, g *Game) {
-	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
+func (p *Player) Reset(pos cp.Vector, g *Game) {
+	p.Body = cp.NewBody(1, cp.MomentForCircle(1, playerRadius, playerRadius, cp.Vector{0, 0}))
 	p.Body.SetVelocityUpdateFunc(playerUpdateVelocity(g, p))
 
-	p.Shape = cp.NewCircle(p.Body, radius, cp.Vector{0, 0})
+	p.Shape = cp.NewCircle(p.Body, playerRadius, cp.Vector{0, 0})
 	p.Shape.SetElasticity(0)
 	p.Shape.SetFriction(1)
 
@@ -52,9 +65,13 @@ func (p *Player) Reset(pos cp.Vector, radius float64, g *Game) {
 	g.Space.AddShape(p.Shape)
 }
 
-func (p *Player) Update(g *Game, dt float64) {
-	p.Object.Update(dt, worldWidth, worldHeight)
+func (s *PlayerSystem) Update(dt float64) {
+	for _, p := range s.players {
+		p.Update(s.game, dt)
+	}
+}
 
+func (p *Player) Update(g *Game, dt float64) {
 	var jumpState bool
 	if p.Joystick > -1 {
 		buttonBytes := glfw.GetJoystickButtons(p.Joystick)
@@ -73,6 +90,12 @@ func (p *Player) Update(g *Game, dt float64) {
 	}
 	p.remainingBoost -= dt
 	p.lastJumpState = jumpState
+}
+
+func (s *PlayerSystem) Draw(alpha float64) {
+	for _, p := range s.players {
+		p.Draw(s.game, alpha)
+	}
 }
 
 func (p *Player) Draw(g *Game, alpha float64) {

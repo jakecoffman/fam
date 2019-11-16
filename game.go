@@ -66,9 +66,10 @@ type Game struct {
 
 	Space *cp.Space
 
-	Players []*Player
-	Bananas eng.System
-	Bombs   eng.System
+	Objects *eng.ObjectSystem
+	Players *PlayerSystem
+	Bananas *BananaSystem
+	Bombs   *BombSystem
 	Walls   []*Wall
 
 	*eng.ResourceManager
@@ -88,15 +89,9 @@ const (
 	worldHeight = 1080
 )
 
-// Game state
 const (
-	stateActive = iota
-	statePause
-)
-
-const (
-	playerVelocity = 11250.0
-	playerRadius   = 25.0
+	gameStateActive = iota
+	gameStatePaused
 )
 
 func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
@@ -137,6 +132,10 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	})
 
 	g.ParticleGenerator = eng.NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
+
+	// systems
+	g.Objects = eng.NewObjectSystem(nil) // space will be set in reset call below
+	g.Players = NewPlayerSystem(g)
 	g.Bananas = NewBananaSystem(g)
 	g.Bombs = NewBombSystem(g)
 
@@ -144,33 +143,27 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	glfw.SetJoystickCallback(func(joy, event int) {
 		if glfw.MonitorEvent(event) == glfw.Connected {
-			if joy+1 <= len(g.Players) {
+			if joy+1 <= len(g.Players.players) {
 				log.Println("Joystick reconnected", joy)
 				return
 			}
 			log.Println("Joystick connected", joy)
-			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
-			g.Players[i].Color = eng.NextColor()
-			g.Players[i].Joystick = glfw.Joystick(joy)
+			g.Players.Add(pos, eng.NextColor(), glfw.Joystick(joy))
 		} else {
 			log.Println("Joystick disconnected", joy)
 		}
 	})
 
-	g.Players = []*Player{}
 	for i := 0; i < 16; i++ {
 		joy := glfw.Joystick(i)
 		if !glfw.JoystickPresent(joy) {
 			break
 		}
-		g.Players = append(g.Players, NewPlayer(center, playerRadius, g))
-		g.Players[i].Color = eng.NextColor()
-		g.Players[i].Joystick = joy
+		g.Players.Add(center, eng.NextColor(), joy)
 	}
 
-	g.state = stateActive
+	g.state = gameStateActive
 
 	openGlWindow.SetCursorPosCallback(func(w *glfw.Window, xpos float64, ypos float64) {
 		ww, wh := w.GetSize()
@@ -179,7 +172,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	openGlWindow.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 		if key == glfw.KeyEscape && action == glfw.Press {
-			if g.state == stateActive {
+			if g.state == gameStateActive {
 				g.pause()
 			} else {
 				g.unpause()
@@ -196,11 +189,8 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			openGlWindow.SetFullscreen(g.fullscreen)
 		}
 		if g.Keys[glfw.KeyEnter] {
-			i := len(g.Players)
 			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
-			g.Players[i].Color = eng.NextColor()
-			g.Players[i].Joystick = glfw.Joystick(-1)
+			g.Players.Add(pos, eng.NextColor(), glfw.Joystick(-1))
 		}
 		// store for continuous application
 		if key >= 0 && key < 1024 {
@@ -213,7 +203,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	})
 
 	openGlWindow.SetMouseButtonCallback(func(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
-		if g.state != stateActive {
+		if g.state != gameStateActive {
 			return
 		}
 		// give the mouse click a little radius to make it easier to click small shapes.
@@ -286,7 +276,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 }
 
 func (g *Game) Update(dt float64) {
-	if g.state == statePause {
+	if g.state == gameStatePaused {
 		return
 	}
 	// update mouse body
@@ -302,10 +292,9 @@ func (g *Game) Update(dt float64) {
 	}
 
 	g.Bombs.Update(dt)
-	g.Bananas.Update(dt)
-	for i := range g.Players {
-		g.Players[i].Update(g, dt)
-	}
+	//g.Bananas.Update(dt)
+	g.Players.Update(dt)
+	g.Objects.Update(dt, worldWidth, worldHeight)
 
 	g.Space.Step(dt)
 }
@@ -333,7 +322,7 @@ func (g *Game) Render(alpha float64) {
 		g.CPRenderer.Flush()
 	}
 
-	if len(g.Players) == 0 {
+	if len(g.Players.players) == 0 {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 
@@ -341,11 +330,9 @@ func (g *Game) Render(alpha float64) {
 
 	g.Bananas.Draw(alpha)
 	g.Bombs.Draw(alpha)
-	for i := range g.Players {
-		g.Players[i].Draw(g, alpha)
-	}
+	g.Players.Draw(alpha)
 
-	if g.state == statePause {
+	if g.state == gameStatePaused {
 		g.gui.Render()
 	}
 }
@@ -356,11 +343,11 @@ func (g *Game) Close() {
 }
 
 func (g *Game) pause() {
-	g.state = statePause
+	g.state = gameStatePaused
 }
 
 func (g *Game) unpause() {
-	g.state = stateActive
+	g.state = gameStateActive
 }
 
 func (g *Game) reset() {
@@ -368,28 +355,21 @@ func (g *Game) reset() {
 	g.Space.Iterations = 10
 	g.Space.SetGravity(cp.Vector{0, Gravity})
 
-	bananaCollisionHandler := g.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
-	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
-	bananaCollisionHandler.UserData = g
-
-	bombCollisionHandler := g.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
-	bombCollisionHandler.PreSolveFunc = BombPreSolve
-
 	g.Space.NewWildcardCollisionHandler(collisionWall).PreSolveFunc = WallPreSolve
-
-	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
 	// load the initial level
 	if err := g.loadLevel("assets/levels/initial.json"); err != nil {
 		panic(err)
 	}
 
-	for _, p := range g.Players {
+	center := cp.Vector{worldWidth / 2, worldHeight / 2}
+	for _, p := range g.Players.players {
 		pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-		p.Reset(pos, playerRadius, g)
+		p.Reset(pos, g)
 	}
 	g.Bananas.Reset()
 	g.Bombs.Reset()
+	g.Objects.Reset(g.Space)
 }
 
 func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {

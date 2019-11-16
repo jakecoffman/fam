@@ -4,15 +4,11 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
-	"log"
 )
 
-const MaxBombs = 100
-
 type BombSystem struct {
-	active   int
 	game     *Game
-	bombs    [MaxBombs]Bomb
+	bombs    map[eng.EntityId]*Bomb
 	renderer *eng.SpriteRenderer
 
 	texture, powTexture *eng.Texture2D
@@ -27,7 +23,7 @@ func NewBombSystem(g *Game) *BombSystem {
 		game:       g,
 		texture:    g.Texture(bombTexture),
 		powTexture: g.Texture(bombPowTexture),
-		bombs:      [MaxBombs]Bomb{},
+		bombs:      map[eng.EntityId]*Bomb{},
 		renderer:   g.SpriteRenderer,
 	}
 }
@@ -49,12 +45,9 @@ const (
 )
 
 func (s *BombSystem) Add() *eng.Object {
-	if s.active >= MaxBombs {
-		return s.bombs[s.active-1].Object
-	}
-	p := &s.bombs[s.active]
-	s.active++
-	p.Object = eng.NewObject(p)
+	p := &Bomb{}
+	p.Object = s.game.Objects.Add(s.game.Space)
+	s.bombs[p.ID] = p
 
 	p.state = bombStateOk
 	p.time = 0
@@ -75,42 +68,19 @@ func (s *BombSystem) Add() *eng.Object {
 	return p.Object
 }
 
-func (s *BombSystem) Get(id eng.EntityId) (ptr *eng.Object, index int) {
-	for i := 0; i < s.active; i++ {
-		if s.bombs[i].ID == id {
-			return s.bombs[i].Object, i
-		}
-	}
-	return nil, -1
-}
-
-func (s *BombSystem) Remove(index int) {
-	if index >= s.active {
-		log.Panic("Removing bomb already removed")
-	}
-	s.active--
-	s.bombs[s.active], s.bombs[index] = s.bombs[index], s.bombs[s.active]
-	bomb := &s.bombs[s.active]
-	bomb.Shape.UserData = nil
-	s.game.Space.RemoveShape(bomb.Shape)
-	s.game.Space.RemoveBody(bomb.Body)
-	bomb.Body.RemoveShape(bomb.Shape)
-	bomb.Shape = nil
-	bomb.Body = nil
+func (s *BombSystem) Remove(id eng.EntityId) {
+	s.game.Objects.Remove(id)
+	delete(s.bombs, id)
 }
 
 func (s *BombSystem) Reset() {
-	for i := 0; i < s.active; i++ {
-		s.game.Space.RemoveShape(s.bombs[i].Shape)
-		s.game.Space.RemoveBody(s.bombs[i].Body)
-	}
-	s.active = 0
+	s.bombs = map[eng.EntityId]*Bomb{}
+	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
+	bombCollisionHandler.PreSolveFunc = BombPreSolve
 }
 
 func (s *BombSystem) Update(dt float64) {
-	for i := 0; i < s.active; i++ {
-		p := &s.bombs[i]
-		p.Object.Update(dt, worldWidth, worldHeight)
+	for _, p := range s.bombs {
 		p.time += dt
 
 		const explosionSizeIncrease = 10
@@ -123,14 +93,13 @@ func (s *BombSystem) Update(dt float64) {
 		}
 		if p.time > 6 {
 			p.state = bombStateGone
-			defer s.Remove(i)
+			defer s.Remove(p.ID)
 		}
 	}
 }
 
 func (s *BombSystem) Draw(alpha float64) {
-	for i := 0; i < s.active; i++ {
-		p := s.bombs[i]
+	for _, p := range s.bombs {
 		if p.state == bombStateGone {
 			return
 		}

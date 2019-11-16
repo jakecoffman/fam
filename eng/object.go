@@ -16,41 +16,81 @@ func GetObjectId() EntityId {
 
 type Object struct {
 	ID EntityId
-	Class interface{}
+	Ptr interface{}
 	*cp.Body
 	*cp.Shape
 
 	lastPosition *cp.Vector
 }
 
-func NewObject(class interface{}) *Object {
-	return &Object{
-		ID: GetObjectId(),
-		Class: class,
+type ObjectSystem struct {
+	objects map[EntityId]*Object
+	space *cp.Space
+}
+
+func NewObjectSystem(space *cp.Space) *ObjectSystem {
+	return &ObjectSystem{
+		space: space,
+		objects: map[EntityId]*Object{},
 	}
 }
 
-func (p *Object) Update(dt, worldWidth, worldHeight float64) {
-	pos := p.Position()
-	p.lastPosition = &pos
+func (s *ObjectSystem) Add(ptr interface{}) *Object {
+	p := &Object{
+		ID: GetObjectId(),
+		Ptr: ptr,
+	}
+	s.objects[p.ID] = p
+	return p
+}
 
-	bb := p.BB()
-	if bb.R < 0 {
-		pos.X = worldWidth+(bb.R-bb.L)/2
+func (s *ObjectSystem) Get(id EntityId) *Object {
+	return s.objects[id]
+}
+
+func (s *ObjectSystem) Remove(id EntityId) {
+	object := s.objects[id]
+	delete(s.objects, id)
+	object.Shape.UserData = nil
+	object.Body.UserData = nil
+	s.space.RemoveShape(object.Shape)
+	s.space.RemoveBody(object.Body)
+	object.Body.RemoveShape(object.Shape)
+	object.Shape = nil
+	object.Body = nil
+}
+
+func (s *ObjectSystem) Reset(space *cp.Space) {
+	for _, o := range s.objects {
+		s.space.RemoveShape(o.Shape)
+		s.space.RemoveBody(o.Body)
 	}
-	if bb.L > worldWidth {
-		pos.X = -(bb.R-bb.L)/2
-	}
-	if bb.T < 0 {
-		pos.Y = worldHeight-(bb.B-bb.T)/2
-	}
-	if bb.B > worldHeight {
-		pos.Y = (bb.B-bb.T)/2
-	}
-	if !pos.Equal(p.Position()) {
-		p.SetPosition(pos)
-		// prevent smoothing
-		p.lastPosition = nil
+	s.space = space
+}
+
+func (s *ObjectSystem) Update(dt, worldWidth, worldHeight float64) {
+	for _, p := range s.objects {
+		pos := p.Position()
+		p.lastPosition = &pos
+
+		bb := p.BB()
+		if bb.R < 0 {
+			pos.X = worldWidth + (bb.R-bb.L)/2
+		}
+		if bb.L > worldWidth {
+			pos.X = -(bb.R - bb.L) / 2
+		}
+		if bb.T < 0 {
+			pos.Y = worldHeight - (bb.B-bb.T)/2
+		}
+		if bb.B > worldHeight {
+			pos.Y = (bb.B - bb.T) / 2
+		}
+		if !pos.Equal(p.Position()) {
+			p.SetPosition(pos)
+			// prevent smoothing
+			p.lastPosition = nil
+		}
 	}
 }
 
