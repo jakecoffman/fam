@@ -9,7 +9,7 @@ import (
 type BananaSystem struct {
 	texture  *eng.Texture2D
 	game     *Game
-	bananas  map[eng.EntityId]*Banana
+	bananas  map[eng.EntityID]*Banana
 	renderer *eng.SpriteRenderer
 }
 
@@ -21,7 +21,7 @@ func NewBananaSystem(g *Game) *BananaSystem {
 	return &BananaSystem{
 		game:     g,
 		texture:  g.Texture("banana"),
-		bananas:  map[eng.EntityId]*Banana{},
+		bananas:  map[eng.EntityID]*Banana{},
 		renderer: g.SpriteRenderer,
 	}
 }
@@ -56,35 +56,36 @@ func (s *BananaSystem) Add() *eng.Object {
 	return p.Object
 }
 
-func (s *BananaSystem) Remove(id eng.EntityId) {
+func (s *BananaSystem) Remove(id eng.EntityID) {
 	s.game.Objects.Remove(id)
 	delete(s.bananas, id)
 }
 
 func (s *BananaSystem) Reset() {
-	s.bananas = map[eng.EntityId]*Banana{}
-	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
-	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
-	bananaCollisionHandler.UserData = s.game
-}
-
-func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
-	game := data.(*Game)
-
-	a, b := arb.Shapes()
-	bid := a.UserData.(eng.EntityId)
-
-	switch b.UserData.(type) {
-	case *Player:
-		player := b.UserData.(*Player)
-		player.Circle.SetRadius(player.Circle.Radius() * 1.1)
-
-		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
-			game.Bananas.Remove(bid)
-		}, nil, nil)
-
-		return false
+	for id := range s.bananas {
+		delete(s.bananas, id)
 	}
+	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
+	bananaCollisionHandler.UserData = s.game
+	bananaPreSolve := func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
+		game := data.(*Game)
 
-	return true
+		a, b := arb.Shapes()
+		bid := a.UserData.(eng.EntityID)
+
+		switch b.UserData.(type) {
+		case *Player:
+			player := b.UserData.(*Player)
+			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
+
+			space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
+				game.Bananas.Remove(bid)
+			}, nil, nil)
+
+			return false
+		}
+
+		return true
+	}
+	bananaCollisionHandler.PreSolveFunc = bananaPreSolve
 }

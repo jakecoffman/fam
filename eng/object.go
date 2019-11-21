@@ -1,21 +1,23 @@
 package eng
 
 import (
+	"log"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 )
 
-type EntityId int
+type EntityID int
 
-var objectId EntityId
+var nextEntityID EntityID
 
-func GetObjectId() EntityId {
-	objectId++
-	return objectId
+func NextEntityID() EntityID {
+	nextEntityID++
+	return nextEntityID
 }
 
 type Object struct {
-	ID EntityId
+	ID  EntityID
 	Ptr interface{}
 	*cp.Body
 	*cp.Shape
@@ -24,31 +26,32 @@ type Object struct {
 }
 
 type ObjectSystem struct {
-	objects map[EntityId]*Object
+	objects map[EntityID]*Object
 	space *cp.Space
 }
 
 func NewObjectSystem(space *cp.Space) *ObjectSystem {
 	return &ObjectSystem{
 		space: space,
-		objects: map[EntityId]*Object{},
+		objects: map[EntityID]*Object{},
 	}
 }
 
 func (s *ObjectSystem) Add(ptr interface{}) *Object {
 	p := &Object{
-		ID: GetObjectId(),
+		ID:  NextEntityID(),
 		Ptr: ptr,
 	}
 	s.objects[p.ID] = p
 	return p
 }
 
-func (s *ObjectSystem) Get(id EntityId) *Object {
+func (s *ObjectSystem) Get(id EntityID) *Object {
 	return s.objects[id]
 }
 
-func (s *ObjectSystem) Remove(id EntityId) {
+func (s *ObjectSystem) Remove(id EntityID) {
+	log.Println("Removing game object", id)
 	object := s.objects[id]
 	delete(s.objects, id)
 	object.Shape.UserData = nil
@@ -61,9 +64,14 @@ func (s *ObjectSystem) Remove(id EntityId) {
 }
 
 func (s *ObjectSystem) Reset(space *cp.Space) {
-	for _, o := range s.objects {
+	for id, o := range s.objects {
 		s.space.RemoveShape(o.Shape)
 		s.space.RemoveBody(o.Body)
+		o.lastPosition = nil
+		o.Ptr = nil
+		o.Body = nil
+		o.Shape = nil
+		delete(s.objects, id)
 	}
 	s.space = space
 }

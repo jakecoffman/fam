@@ -18,6 +18,7 @@ type Gui struct {
 
 	game *Game
 
+	showMainMenu      bool
 	showDemoWindow    bool
 	showAnotherWindow bool
 }
@@ -102,68 +103,8 @@ func (gui *Gui) Render() {
 		imgui.ShowDemoWindow(&gui.showDemoWindow)
 	}
 
-	// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-	{
-		imgui.Begin("Menu")
-
-		if imgui.Button("Resume game") {
-			gui.game.unpause()
-		}
-
-		if imgui.Button("Save level") {
-			filename, err := dialog.File().Filter("JSON files", "json").Title("Save Level").Save()
-			if err != nil {
-				log.Println(err)
-			} else {
-				gui.game.saveLevel(filename)
-			}
-		}
-
-		if imgui.Button("Load level") {
-			filename, err := dialog.File().Filter("JSON files", "json").Title("Load Level").Load()
-			if err != nil {
-				log.Println(err)
-			} else {
-				_ = gui.game.loadLevel(filename)
-			}
-		}
-
-		// LMB, RMB action
-		//items := []string{actionBanana, actionBomb}
-
-		//if imgui.BeginComboV("LMB", gui.game.lmbAction, imgui.ComboFlagNoArrowButton) {
-		//	for _, item := range items {
-		//		isSelected := gui.game.lmbAction == item
-		//		if imgui.SelectableV(item, isSelected, 0, imgui.Vec2{}) {
-		//			gui.game.lmbAction = item
-		//		}
-		//		if isSelected {
-		//			imgui.SetItemDefaultFocus()
-		//		}
-		//	}
-		//	imgui.EndCombo()
-		//}
-
-		if imgui.Button("Reset objects") {
-			gui.game.reset()
-		}
-
-		imgui.Checkbox("Render Physics", &gui.game.shouldRenderCp)
-		if imgui.Checkbox("Vsync", &gui.game.vsync) {
-			if gui.game.vsync {
-				glfw.SwapInterval(1)
-			} else {
-				glfw.SwapInterval(0)
-			}
-		}
-
-		if imgui.ButtonV("Quit", imgui.Vec2{200, 20}) {
-			gui.game.window.SetShouldClose(true)
-		}
-
-		// TODO add text of FPS based on IO.Framerate()
-
-		imgui.End()
+	if gui.showMainMenu {
+		gui.renderMainMenu()
 	}
 
 	// 3. Show another simple window.
@@ -180,4 +121,77 @@ func (gui *Gui) Render() {
 
 	imgui.Render()
 	gui.renderer.Render(p.DisplaySize(), p.FramebufferSize(), imgui.RenderedDrawData())
+}
+
+func (gui *Gui) renderMainMenu() {
+	imgui.BeginV("Menu", &gui.showMainMenu, imgui.WindowFlagsAlwaysAutoResize)
+
+	if gui.game.state == gameStatePaused {
+		if imgui.Button("Resume game") {
+			gui.game.unpause()
+		}
+	}
+
+	if gui.game.state == gameStateActive {
+		if imgui.Button("Pause game") {
+			gui.game.pause()
+		}
+	}
+
+	if imgui.Button("Save level") {
+		filename, err := dialog.File().Filter("JSON files", "json").Title("Save Level").Save()
+		if err != nil {
+			log.Println(err)
+		} else {
+			gui.game.saveLevel(filename)
+		}
+	}
+
+	imgui.SameLine()
+
+	if imgui.Button("Load level") {
+		filename, err := dialog.File().Filter("JSON files", "json").Title("Load Level").Load()
+		if err != nil {
+			log.Println(err)
+		} else {
+			_ = gui.game.loadLevel(filename)
+		}
+	}
+
+	// LMB, RMB action
+	//items := []string{actionBanana, actionBomb}
+
+	//if imgui.BeginComboV("LMB", gui.game.lmbAction, imgui.ComboFlagNoArrowButton) {
+	//	for _, item := range items {
+	//		isSelected := gui.game.lmbAction == item
+	//		if imgui.SelectableV(item, isSelected, 0, imgui.Vec2{}) {
+	//			gui.game.lmbAction = item
+	//		}
+	//		if isSelected {
+	//			imgui.SetItemDefaultFocus()
+	//		}
+	//	}
+	//	imgui.EndCombo()
+	//}
+
+	if imgui.Button("Reset objects") {
+		gui.game.reset()
+	}
+
+	imgui.Checkbox("Render Physics", &gui.game.shouldRenderCp)
+	if imgui.Checkbox("Vsync", &gui.game.vsync) {
+		if gui.game.vsync {
+			glfw.SwapInterval(1)
+		} else {
+			glfw.SwapInterval(0)
+		}
+	}
+
+	if imgui.ButtonV("Quit", imgui.Vec2{200, 20}) {
+		gui.game.window.SetShouldClose(true)
+	}
+
+	// TODO add text of FPS based on IO.Framerate()
+
+	imgui.End()
 }

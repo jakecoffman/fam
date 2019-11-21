@@ -1,6 +1,8 @@
 package fam
 
 import (
+	"log"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
@@ -8,7 +10,7 @@ import (
 
 type BombSystem struct {
 	game     *Game
-	bombs    map[eng.EntityId]*Bomb
+	bombs    map[eng.EntityID]*Bomb
 	renderer *eng.SpriteRenderer
 
 	texture, powTexture *eng.Texture2D
@@ -23,7 +25,7 @@ func NewBombSystem(g *Game) *BombSystem {
 		game:       g,
 		texture:    g.Texture(bombTexture),
 		powTexture: g.Texture(bombPowTexture),
-		bombs:      map[eng.EntityId]*Bomb{},
+		bombs:      map[eng.EntityID]*Bomb{},
 		renderer:   g.SpriteRenderer,
 	}
 }
@@ -68,15 +70,35 @@ func (s *BombSystem) Add() *eng.Object {
 	return p.Object
 }
 
-func (s *BombSystem) Remove(id eng.EntityId) {
+func (s *BombSystem) Remove(id eng.EntityID) {
+	log.Println("Removing bomb", id)
 	s.game.Objects.Remove(id)
 	delete(s.bombs, id)
 }
 
 func (s *BombSystem) Reset() {
-	s.bombs = map[eng.EntityId]*Bomb{}
+	for id := range s.bombs {
+		delete(s.bombs, id)
+	}
 	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
-	bombCollisionHandler.PreSolveFunc = BombPreSolve
+	bombPreSolve := func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
+		a, b := arb.Shapes()
+
+		bomb := a.UserData.(*Bomb)
+		if bomb.state != bombStateBoom {
+			return true
+		}
+
+		switch b.UserData.(type) {
+		case *Player:
+			player := b.UserData.(*Player)
+			player.Circle.SetRadius(playerRadius)
+			return true
+		}
+
+		return true
+	}
+	bombCollisionHandler.PreSolveFunc = bombPreSolve
 }
 
 func (s *BombSystem) Update(dt float64) {
@@ -93,7 +115,7 @@ func (s *BombSystem) Update(dt float64) {
 		}
 		if p.time > 6 {
 			p.state = bombStateGone
-			defer s.Remove(p.ID)
+			s.Remove(p.ID)
 		}
 	}
 }
@@ -122,22 +144,4 @@ func (s *BombSystem) Draw(alpha float64) {
 
 		s.renderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
 	}
-}
-
-func BombPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
-	a, b := arb.Shapes()
-
-	bomb := a.UserData.(*Bomb)
-	if bomb.state != bombStateBoom {
-		return true
-	}
-
-	switch b.UserData.(type) {
-	case *Player:
-		player := b.UserData.(*Player)
-		player.Circle.SetRadius(playerRadius)
-		return true
-	}
-
-	return true
 }

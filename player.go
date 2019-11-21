@@ -2,6 +2,7 @@ package fam
 
 import (
 	"math"
+	"math/rand"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -11,7 +12,7 @@ import (
 
 type PlayerSystem struct {
 	game *Game
-	players map[eng.EntityId]*Player
+	players map[eng.EntityID]*Player
 }
 
 type Player struct {
@@ -29,7 +30,7 @@ type Player struct {
 func NewPlayerSystem(game *Game) *PlayerSystem {
 	return &PlayerSystem{
 		game: game,
-		players: map[eng.EntityId]*Player{},
+		players: map[eng.EntityID]*Player{},
 	}
 }
 
@@ -42,27 +43,35 @@ func (s *PlayerSystem) Add(pos cp.Vector, color mgl32.Vec3, joystick glfw.Joysti
 	}
 	p.Object = s.game.Objects.Add(s.game.Space)
 	s.players[p.ID] = p
-	p.Reset(pos, s.game)
-	return p
-}
-
-func (p *Player) Reset(pos cp.Vector, g *Game) {
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, playerRadius, playerRadius, cp.Vector{0, 0}))
-	p.Body.SetVelocityUpdateFunc(playerUpdateVelocity(g, p))
+	p.Body.SetVelocityUpdateFunc(playerUpdateVelocity(s.game, p))
 
 	p.Shape = cp.NewCircle(p.Body, playerRadius, cp.Vector{0, 0})
 	p.Shape.SetElasticity(0)
 	p.Shape.SetFriction(1)
 
-	p.Shape.SetFilter(cp.NewShapeFilter(uint(eng.GetObjectId()), PlayerMaskBit, PlayerMaskBit))
+	p.Shape.SetFilter(cp.NewShapeFilter(uint(eng.NextEntityID()), PlayerMaskBit, PlayerMaskBit))
 	p.Shape.SetCollisionType(collisionPlayer)
 	p.Shape.UserData = p
 
 	p.Circle = p.Shape.Class.(*cp.Circle)
 	p.Body.SetPosition(pos)
 
-	g.Space.AddBody(p.Body)
-	g.Space.AddShape(p.Shape)
+	s.game.Space.AddBody(p.Body)
+	s.game.Space.AddShape(p.Shape)
+	return p
+}
+
+func (s *PlayerSystem) Reset() {
+	oldPlayers := s.players
+	s.players = map[eng.EntityID]*Player{}
+	pos := cp.Vector{centerOfWorld.X + rand.Float64()*10, centerOfWorld.Y + rand.Float64()*10}
+	for id, p := range oldPlayers {
+		if p.Joystick >= 0 {
+			s.Add(pos, p.Color, p.Joystick)
+		}
+		delete(oldPlayers, id)
+	}
 }
 
 func (s *PlayerSystem) Update(dt float64) {

@@ -13,15 +13,17 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/inkyblackness/imgui-go"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
 )
 
 var GrabbableMaskBit uint = 1 << 31
 
-var GrabFilter = cp.ShapeFilter{
-	cp.NO_GROUP, GrabbableMaskBit, GrabbableMaskBit,
-}
+//var GrabFilter = cp.ShapeFilter{
+//	cp.NO_GROUP, GrabbableMaskBit, GrabbableMaskBit,
+//}
+
 var NotGrabbableFilter = cp.ShapeFilter{
 	cp.NO_GROUP, ^GrabbableMaskBit, ^GrabbableMaskBit,
 }
@@ -32,9 +34,9 @@ var PlayerFilter = cp.ShapeFilter{
 	cp.NO_GROUP, PlayerMaskBit, PlayerMaskBit,
 }
 
-var NotPlayerFilter = cp.ShapeFilter{
-	cp.NO_GROUP, ^PlayerMaskBit, ^PlayerMaskBit,
-}
+//var NotPlayerFilter = cp.ShapeFilter{
+//	cp.NO_GROUP, ^PlayerMaskBit, ^PlayerMaskBit,
+//}
 
 const (
 	_ = iota
@@ -70,7 +72,7 @@ type Game struct {
 	Players *PlayerSystem
 	Bananas *BananaSystem
 	Bombs   *BombSystem
-	Walls   []*Wall
+	Walls   *WallSystem
 
 	*eng.ResourceManager
 
@@ -94,6 +96,8 @@ const (
 	gameStatePaused
 )
 
+var centerOfWorld = cp.Vector{worldWidth/2, worldHeight/2}
+
 func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.vsync = true
 	g.window = openGlWindow
@@ -107,8 +111,6 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.LoadShader("assets/shaders/particle.vs.glsl", "assets/shaders/particle.fs.glsl", "particle")
 	g.LoadShader("assets/shaders/cp.vs.glsl", "assets/shaders/cp.fs.glsl", "cp")
 	g.LoadShader("assets/shaders/text.vs.glsl", "assets/shaders/text.fs.glsl", "text")
-
-	center := cp.Vector{worldWidth / 2, worldHeight / 2}
 
 	g.projection = mgl32.Ortho(0, worldWidth, worldHeight, 0, -1, 1)
 	g.Shader("sprite").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
@@ -138,141 +140,26 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.Players = NewPlayerSystem(g)
 	g.Bananas = NewBananaSystem(g)
 	g.Bombs = NewBombSystem(g)
+	g.Walls = NewWallSystem(g)
 
 	g.reset()
 
-	glfw.SetJoystickCallback(func(joy, event int) {
-		if glfw.MonitorEvent(event) == glfw.Connected {
-			if joy+1 <= len(g.Players.players) {
-				log.Println("Joystick reconnected", joy)
-				return
-			}
-			log.Println("Joystick connected", joy)
-			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players.Add(pos, eng.NextColor(), glfw.Joystick(joy))
-		} else {
-			log.Println("Joystick disconnected", joy)
-		}
-	})
+	glfw.SetJoystickCallback(g.joystickCallback)
 
+	// run though the connected joysticks and add players for each one
 	for i := 0; i < 16; i++ {
 		joy := glfw.Joystick(i)
 		if !glfw.JoystickPresent(joy) {
 			break
 		}
-		g.Players.Add(center, eng.NextColor(), joy)
+		g.Players.Add(centerOfWorld, eng.NextColor(), joy)
 	}
 
 	g.state = gameStateActive
 
-	openGlWindow.SetCursorPosCallback(func(w *glfw.Window, xpos float64, ypos float64) {
-		ww, wh := w.GetSize()
-		g.mouse = g.MouseToSpace(xpos, ypos, ww, wh)
-	})
-
-	openGlWindow.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		if key == glfw.KeyEscape && action == glfw.Press {
-			if g.state == gameStateActive {
-				g.pause()
-			} else {
-				g.unpause()
-			}
-		}
-		if g.Keys[glfw.KeyE] {
-			g.Bananas.Add().SetPosition(g.mouse)
-		}
-		if g.Keys[glfw.KeyQ] {
-			g.Bombs.Add().SetPosition(g.mouse)
-		}
-		if g.Keys[glfw.KeyF] {
-			g.fullscreen = !g.fullscreen
-			openGlWindow.SetFullscreen(g.fullscreen)
-		}
-		if g.Keys[glfw.KeyEnter] {
-			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players.Add(pos, eng.NextColor(), glfw.Joystick(-1))
-		}
-		// store for continuous application
-		if key >= 0 && key < 1024 {
-			if action == glfw.Press {
-				g.Keys[key] = true
-			} else if action == glfw.Release {
-				g.Keys[key] = false
-			}
-		}
-	})
-
-	openGlWindow.SetMouseButtonCallback(func(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
-		if g.state != gameStateActive {
-			return
-		}
-		// give the mouse click a little radius to make it easier to click small shapes.
-		const clickRadius = 5
-
-		if button == glfw.MouseButton1 {
-			if action == glfw.Press {
-				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
-
-				if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
-					var nearest cp.Vector
-					if info.Distance > 0 {
-						nearest = info.Point
-					} else {
-						nearest = g.mouse
-					}
-
-					body := info.Shape.Body()
-					g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
-					g.mouseJoint.SetMaxForce(50000)
-					g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
-					g.Space.AddConstraint(g.mouseJoint)
-				} else {
-					leftDown := g.mouse.Clone()
-					g.leftDown = &leftDown
-					wall := NewWall(g, *g.leftDown, g.mouse)
-					g.drawingWallShape = wall
-					g.Walls = append(g.Walls, g.drawingWallShape)
-				}
-				return
-			}
-			// mouse up
-			if g.mouseJoint != nil {
-				g.Space.RemoveConstraint(g.mouseJoint)
-				g.mouseJoint = nil
-				return
-			}
-			if g.leftDown != nil {
-				g.leftDown = nil
-			}
-			return
-		}
-
-		if button == glfw.MouseButton2 {
-			if action == glfw.Press {
-				rightDown := g.mouse.Clone()
-				g.rightDown = &rightDown
-			} else {
-				g.rightDown = nil
-
-				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
-
-				if info.Shape != nil {
-					if segment, ok := info.Shape.Class.(*cp.Segment); ok {
-						for i, w := range g.Walls {
-							if segment == w.Segment {
-								g.Walls = append(g.Walls[:i], g.Walls[i+1:]...)
-								g.Space.AddPostStepCallback(func(space *cp.Space, key interface{}, data interface{}) {
-									space.RemoveShape(w.Shape)
-									space.RemoveBody(w.Body())
-								}, nil, nil)
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-	})
+	openGlWindow.SetCursorPosCallback(g.mouseMoveCallback)
+	openGlWindow.SetKeyCallback(g.keyCallback)
+	openGlWindow.SetMouseButtonCallback(g.mouseCallback)
 }
 
 func (g *Game) Update(dt float64) {
@@ -314,15 +201,14 @@ func (g *Game) Render(alpha float64) {
 		g.CPRenderer.Clear()
 		if g.shouldRenderCp {
 			g.CPRenderer.DrawSpace(g.Space)
-		} else {
-			for i := range g.Walls {
-				g.Walls[i].Draw(g, alpha)
-			}
 		}
+		g.Walls.Draw(alpha)
 		g.CPRenderer.Flush()
 	}
 
-	if len(g.Players.players) == 0 {
+	if g.state == gameStatePaused {
+		g.TextRenderer.Print("Paused (press P to unpause)", float64(g.window.Width)/2.-150., float64(g.window.Height)/2., 1)
+	} else if len(g.Players.players) == 0 {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 
@@ -332,9 +218,7 @@ func (g *Game) Render(alpha float64) {
 	g.Bombs.Draw(alpha)
 	g.Players.Draw(alpha)
 
-	if g.state == gameStatePaused {
-		g.gui.Render()
-	}
+	g.gui.Render()
 }
 
 func (g *Game) Close() {
@@ -355,21 +239,15 @@ func (g *Game) reset() {
 	g.Space.Iterations = 10
 	g.Space.SetGravity(cp.Vector{0, Gravity})
 
-	g.Space.NewWildcardCollisionHandler(collisionWall).PreSolveFunc = WallPreSolve
+	g.Objects.Reset(g.Space)
+	g.Players.Reset()
+	g.Bananas.Reset()
+	g.Bombs.Reset()
+	g.Walls.Reset()
 
-	// load the initial level
 	if err := g.loadLevel("assets/levels/initial.json"); err != nil {
 		panic(err)
 	}
-
-	center := cp.Vector{worldWidth / 2, worldHeight / 2}
-	for _, p := range g.Players.players {
-		pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-		p.Reset(pos, g)
-	}
-	g.Bananas.Reset()
-	g.Bombs.Reset()
-	g.Objects.Reset(g.Space)
 }
 
 func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {
@@ -392,7 +270,7 @@ func (g *Game) saveLevel(filename string) {
 		A, B cp.Vector
 	}
 	var data []entry
-	for _, w := range g.Walls {
+	for _, w := range g.Walls.walls {
 		data = append(data, entry{w.A(), w.B()})
 	}
 	if err = json.NewEncoder(file).Encode(data); err != nil {
@@ -415,12 +293,135 @@ func (g *Game) loadLevel(name string) error {
 		return err
 	}
 
-	g.Walls = []*Wall{}
 	for _, w := range data {
-		wall := NewWall(g, w.A, w.B)
-		g.Space.AddShape(wall.Segment.Shape)
-		g.Walls = append(g.Walls, wall)
+		wall := g.Walls.Add(w.A, w.B)
+		g.Space.AddShape(wall.Shape)
 	}
 
 	return nil
+}
+
+func (g *Game) mouseCallback(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
+	if imgui.CurrentIO().WantCaptureMouse() {
+		// the gui is handling the mouse action
+		return
+	}
+	if g.state != gameStateActive {
+		return
+	}
+	// give the mouse click a little radius to make it easier to click small shapes.
+	const clickRadius = 5
+
+	if button == glfw.MouseButton1 {
+		if action == glfw.Press {
+			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+
+			if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
+				var nearest cp.Vector
+				if info.Distance > 0 {
+					nearest = info.Point
+				} else {
+					nearest = g.mouse
+				}
+
+				body := info.Shape.Body()
+				g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
+				g.mouseJoint.SetMaxForce(50000)
+				g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
+				g.Space.AddConstraint(g.mouseJoint)
+			} else {
+				leftDown := g.mouse.Clone()
+				g.leftDown = &leftDown
+				g.drawingWallShape = g.Walls.Add(*g.leftDown, g.mouse)
+			}
+			return
+		}
+		// mouse up
+		if g.mouseJoint != nil {
+			g.Space.RemoveConstraint(g.mouseJoint)
+			g.mouseJoint = nil
+			return
+		}
+		if g.leftDown != nil {
+			g.leftDown = nil
+		}
+		return
+	}
+
+	if button == glfw.MouseButton2 {
+		if action == glfw.Press {
+			rightDown := g.mouse.Clone()
+			g.rightDown = &rightDown
+		} else {
+			g.rightDown = nil
+
+			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+
+			if info.Shape != nil {
+				if id, ok := info.Shape.UserData.(eng.EntityID); ok {
+					g.Space.AddPostStepCallback(func(space *cp.Space, key interface{}, data interface{}) {
+						g.Walls.Remove(id)
+					}, nil, nil)
+				}
+			}
+		}
+	}
+}
+
+func (g *Game) keyCallback(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if imgui.CurrentIO().WantCaptureKeyboard() {
+		// the gui is handling the keyboard callback
+		return
+	}
+	if key == glfw.KeyEscape && action == glfw.Press {
+		g.gui.showMainMenu = !g.gui.showMainMenu
+	}
+	if key == glfw.KeyP && action == glfw.Press {
+		if g.state == gameStateActive {
+			g.pause()
+		} else {
+			g.unpause()
+		}
+	}
+	if g.Keys[glfw.KeyE] {
+		g.Bananas.Add().SetPosition(g.mouse)
+	}
+	if g.Keys[glfw.KeyQ] {
+		g.Bombs.Add().SetPosition(g.mouse)
+	}
+	if g.Keys[glfw.KeyF] {
+		g.fullscreen = !g.fullscreen
+		g.window.SetFullscreen(g.fullscreen)
+	}
+	if g.Keys[glfw.KeyEnter] {
+		pos := cp.Vector{centerOfWorld.X + rand.Float64()*10, centerOfWorld.Y + rand.Float64()*10}
+		g.Players.Add(pos, eng.NextColor(), glfw.Joystick(-1))
+	}
+	// store for continuous application
+	if key >= 0 && key < 1024 {
+		if action == glfw.Press {
+			g.Keys[key] = true
+		} else if action == glfw.Release {
+			g.Keys[key] = false
+		}
+	}
+}
+
+func (g *Game) joystickCallback(joy, event int) {
+	if glfw.MonitorEvent(event) == glfw.Connected {
+		if joy+1 <= len(g.Players.players) {
+			log.Println("Joystick reconnected", joy)
+			return
+		}
+		log.Println("Joystick connected", joy)
+		pos := cp.Vector{centerOfWorld.X + rand.Float64()*10, centerOfWorld.Y + rand.Float64()*10}
+		g.Players.Add(pos, eng.NextColor(), glfw.Joystick(joy))
+	} else {
+		log.Println("Joystick disconnected", joy)
+	}
+}
+
+func (g *Game) mouseMoveCallback(w *glfw.Window, xpos float64, ypos float64) {
+	ww, wh := w.GetSize()
+	g.mouse = g.MouseToSpace(xpos, ypos, ww, wh)
 }
