@@ -3,7 +3,7 @@ package fam
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
-	"github.com/jakecoffman/fam/eng"
+	"github.com/jakecoffman/eng"
 )
 
 type BananaSystem struct {

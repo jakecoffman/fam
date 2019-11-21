@@ -2,7 +2,7 @@ package fam
 
 import (
 	"github.com/jakecoffman/cp"
-	"github.com/jakecoffman/fam/eng"
+	"github.com/jakecoffman/eng"
 )
 
 // Walls have no body of their own, they use the global static body, so this does not use eng.Object

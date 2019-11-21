@@ -7,7 +7,7 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
-	"github.com/jakecoffman/fam/eng"
+	"github.com/jakecoffman/eng"
 )
 
 type PlayerSystem struct {

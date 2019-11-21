@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/jakecoffman/fam"
-	"github.com/jakecoffman/fam/eng"
+	"github.com/jakecoffman/eng"
 )
 
 func main() {
