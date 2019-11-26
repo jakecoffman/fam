@@ -21,13 +21,32 @@ func NewBombSystem(g *Game) *BombSystem {
 		bombTexture    = "bomb"
 		bombPowTexture = "pow"
 	)
-	return &BombSystem{
+	s := &BombSystem{
 		game:       g,
 		texture:    g.Texture(bombTexture),
 		powTexture: g.Texture(bombPowTexture),
 		bombs:      map[eng.EntityID]*Bomb{},
 		renderer:   g.SpriteRenderer,
 	}
+	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
+	bombCollisionHandler.PreSolveFunc = func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
+		a, b := arb.Shapes()
+
+		bomb := a.UserData.(*Bomb)
+		if bomb.state != bombStateBoom {
+			return true
+		}
+
+		switch b.UserData.(type) {
+		case *Player:
+			player := b.UserData.(*Player)
+			player.Circle.SetRadius(playerRadius)
+			return true
+		}
+
+		return true
+	}
+	return s
 }
 
 type Bomb struct {
@@ -74,31 +93,6 @@ func (s *BombSystem) Remove(id eng.EntityID) {
 	log.Println("Removing bomb", id)
 	s.game.Objects.Remove(id)
 	delete(s.bombs, id)
-}
-
-func (s *BombSystem) Reset() {
-	for id := range s.bombs {
-		delete(s.bombs, id)
-	}
-	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
-	bombPreSolve := func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
-		a, b := arb.Shapes()
-
-		bomb := a.UserData.(*Bomb)
-		if bomb.state != bombStateBoom {
-			return true
-		}
-
-		switch b.UserData.(type) {
-		case *Player:
-			player := b.UserData.(*Player)
-			player.Circle.SetRadius(playerRadius)
-			return true
-		}
-
-		return true
-	}
-	bombCollisionHandler.PreSolveFunc = bombPreSolve
 }
 
 func (s *BombSystem) Update(dt float64) {

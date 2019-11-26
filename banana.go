@@ -18,12 +18,35 @@ type Banana struct {
 }
 
 func NewBananaSystem(g *Game) *BananaSystem {
-	return &BananaSystem{
+	s := &BananaSystem{
 		game:     g,
 		texture:  g.Texture("banana"),
 		bananas:  map[eng.EntityID]*Banana{},
 		renderer: g.SpriteRenderer,
 	}
+	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
+	bananaCollisionHandler.UserData = s.game
+	bananaCollisionHandler.PreSolveFunc = func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
+		game := data.(*Game)
+
+		a, b := arb.Shapes()
+		bid := a.UserData.(eng.EntityID)
+
+		switch b.UserData.(type) {
+		case *Player:
+			player := b.UserData.(*Player)
+			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
+
+			space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
+				game.Bananas.Remove(bid)
+			}, nil, nil)
+
+			return false
+		}
+
+		return true
+	}
+	return s
 }
 
 func (s *BananaSystem) Draw(alpha float64) {
@@ -59,33 +82,4 @@ func (s *BananaSystem) Add() *eng.Object {
 func (s *BananaSystem) Remove(id eng.EntityID) {
 	s.game.Objects.Remove(id)
 	delete(s.bananas, id)
-}
-
-func (s *BananaSystem) Reset() {
-	for id := range s.bananas {
-		delete(s.bananas, id)
-	}
-	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
-	bananaCollisionHandler.UserData = s.game
-	bananaPreSolve := func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
-		game := data.(*Game)
-
-		a, b := arb.Shapes()
-		bid := a.UserData.(eng.EntityID)
-
-		switch b.UserData.(type) {
-		case *Player:
-			player := b.UserData.(*Player)
-			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
-
-			space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
-				game.Bananas.Remove(bid)
-			}, nil, nil)
-
-			return false
-		}
-
-		return true
-	}
-	bananaCollisionHandler.PreSolveFunc = bananaPreSolve
 }

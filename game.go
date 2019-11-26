@@ -135,13 +135,6 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	g.ParticleGenerator = eng.NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 
-	// systems
-	g.Objects = eng.NewObjectSystem(nil) // space will be set in reset call below
-	g.Players = NewPlayerSystem(g)
-	g.Bananas = NewBananaSystem(g)
-	g.Bombs = NewBombSystem(g)
-	g.Walls = NewWallSystem(g)
-
 	g.reset()
 
 	glfw.SetJoystickCallback(g.joystickCallback)
@@ -239,11 +232,20 @@ func (g *Game) reset() {
 	g.Space.Iterations = 10
 	g.Space.SetGravity(cp.Vector{0, Gravity})
 
-	g.Objects.Reset(g.Space)
-	g.Players.Reset()
-	g.Bananas.Reset()
-	g.Bombs.Reset()
-	g.Walls.Reset()
+	if g.Objects != nil {
+		g.Objects.Reset(g.Space)
+	} else {
+		g.Objects = eng.NewObjectSystem(g.Space)
+	}
+	if g.Players != nil {
+		g.Players.Reset()
+	} else {
+		g.Players = NewPlayerSystem(g)
+	}
+
+	g.Bananas = NewBananaSystem(g)
+	g.Bombs = NewBombSystem(g)
+	g.Walls = NewWallSystem(g)
 
 	if err := g.loadLevel("assets/levels/initial.json"); err != nil {
 		panic(err)
