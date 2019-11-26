@@ -66,9 +66,10 @@ func (s *WallSystem) Remove(id eng.EntityID) {
 	s.game.Space.RemoveShape(s.walls[id].Shape)
 	delete(s.walls, id)
 	s.active--
-	for i, p := range s.pool {
-		if s.pool[i].ID == p.ID {
+	for i := 0; i < s.active; i++ {
+		if s.pool[i].ID == id {
 			s.pool[s.active], s.pool[i] = s.pool[i], s.pool[s.active]
+			s.walls[s.pool[i].ID] = &s.pool[i]
 			break
 		}
 	}
