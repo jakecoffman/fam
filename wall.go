@@ -14,6 +14,8 @@ type WallSystem struct {
 	walls  map[eng.EntityID]*Wall
 	active int
 	pool   [maxWalls]Wall
+
+	drawingWallShape *Wall
 }
 
 type Wall struct {
@@ -72,6 +74,15 @@ func (s *WallSystem) Remove(id eng.EntityID) {
 			s.walls[s.pool[i].ID] = &s.pool[i]
 			break
 		}
+	}
+}
+
+func (s *WallSystem) Update(dt float64) {
+	if s.game.mouse.leftDownPos != nil {
+		s.drawingWallShape.SetEndpoints(*s.game.mouse.leftDownPos, s.game.mouse.worldPos)
+	} else if s.drawingWallShape != nil {
+		s.game.Space.AddShape(s.drawingWallShape.Shape)
+		s.drawingWallShape = nil
 	}
 }
 

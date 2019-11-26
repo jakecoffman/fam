@@ -56,15 +56,7 @@ type Game struct {
 
 	projection mgl32.Mat4
 
-	// mouse stuff
-	mouse      cp.Vector
-	mouseBody  *cp.Body
-	mouseJoint *cp.Constraint
-
-	leftDown  *cp.Vector
-	rightDown *cp.Vector
-
-	drawingWallShape *Wall
+	mouse Mouse
 
 	Space *cp.Space
 
@@ -103,7 +95,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.window = openGlWindow
 	g.gui = NewGui(g)
 	g.Keys = [1024]bool{}
-	g.mouseBody = cp.NewKinematicBody()
+	g.mouse.New()
 
 	g.ResourceManager = eng.NewResourceManager()
 
@@ -156,26 +148,15 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 }
 
 func (g *Game) Update(dt float64) {
+	g.mouse.Update(dt)
+	g.Walls.Update(dt)
 	if g.state == gameStatePaused {
 		return
 	}
-	// update mouse body
-	newPoint := g.mouseBody.Position().Lerp(g.mouse, 0.25)
-	g.mouseBody.SetVelocityVector(newPoint.Sub(g.mouseBody.Position()).Mult(60.0))
-	g.mouseBody.SetPosition(newPoint)
-
-	if g.leftDown != nil {
-		g.drawingWallShape.SetEndpoints(*g.leftDown, g.mouse)
-	} else if g.drawingWallShape != nil {
-		g.Space.AddShape(g.drawingWallShape.Shape)
-		g.drawingWallShape = nil
-	}
-
 	g.Bombs.Update(dt)
 	//g.Bananas.Update(dt)
 	g.Players.Update(dt)
 	g.Objects.Update(dt, worldWidth, worldHeight)
-
 	g.Space.Step(dt)
 }
 
@@ -205,7 +186,7 @@ func (g *Game) Render(alpha float64) {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 
-	//g.SpriteRenderer.DrawSprite(g.Texture("banana"), V(g.mouse), mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
+	//g.SpriteRenderer.DrawSprite(g.Texture("banana"), V(g.worldPos), mgl32.Vec2{100, 100}, 0, mgl32.Vec3{1, 0, 0})
 
 	g.Bananas.Draw(alpha)
 	g.Bombs.Draw(alpha)
@@ -305,59 +286,59 @@ func (g *Game) loadLevel(name string) error {
 
 func (g *Game) mouseCallback(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
 	if imgui.CurrentIO().WantCaptureMouse() {
-		// the gui is handling the mouse action
+		// the gui is handling the worldPos action
 		return
 	}
 	if g.state != gameStateActive {
 		return
 	}
-	// give the mouse click a little radius to make it easier to click small shapes.
+	// give the worldPos click a little radius to make it easier to click small shapes.
 	const clickRadius = 5
 
 	if button == glfw.MouseButton1 {
 		if action == glfw.Press {
-			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+			info := g.Space.PointQueryNearest(g.mouse.worldPos, clickRadius, NotGrabbableFilter)
 
 			if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
 				var nearest cp.Vector
 				if info.Distance > 0 {
 					nearest = info.Point
 				} else {
-					nearest = g.mouse
+					nearest = g.mouse.worldPos
 				}
 
 				body := info.Shape.Body()
-				g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
-				g.mouseJoint.SetMaxForce(50000)
-				g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
-				g.Space.AddConstraint(g.mouseJoint)
+				g.mouse.joint = cp.NewPivotJoint2(g.mouse.body, body, cp.Vector{}, body.WorldToLocal(nearest))
+				g.mouse.joint.SetMaxForce(50000)
+				g.mouse.joint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
+				g.Space.AddConstraint(g.mouse.joint)
 			} else {
-				leftDown := g.mouse.Clone()
-				g.leftDown = &leftDown
-				g.drawingWallShape = g.Walls.Add(*g.leftDown, g.mouse)
+				leftDown := g.mouse.worldPos.Clone()
+				g.mouse.leftDownPos = &leftDown
+				g.Walls.drawingWallShape = g.Walls.Add(*g.mouse.leftDownPos, g.mouse.worldPos)
 			}
 			return
 		}
-		// mouse up
-		if g.mouseJoint != nil {
-			g.Space.RemoveConstraint(g.mouseJoint)
-			g.mouseJoint = nil
+		// worldPos up
+		if g.mouse.joint != nil {
+			g.Space.RemoveConstraint(g.mouse.joint)
+			g.mouse.joint = nil
 			return
 		}
-		if g.leftDown != nil {
-			g.leftDown = nil
+		if g.mouse.leftDownPos != nil {
+			g.mouse.leftDownPos = nil
 		}
 		return
 	}
 
 	if button == glfw.MouseButton2 {
 		if action == glfw.Press {
-			rightDown := g.mouse.Clone()
-			g.rightDown = &rightDown
+			rightDown := g.mouse.worldPos.Clone()
+			g.mouse.rightDownPos = &rightDown
 		} else {
-			g.rightDown = nil
+			g.mouse.rightDownPos = nil
 
-			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+			info := g.Space.PointQueryNearest(g.mouse.worldPos, clickRadius, NotGrabbableFilter)
 
 			if info.Shape != nil {
 				if id, ok := info.Shape.UserData.(eng.EntityID); ok {
@@ -386,10 +367,10 @@ func (g *Game) keyCallback(window *glfw.Window, key glfw.Key, scancode int, acti
 		}
 	}
 	if g.Keys[glfw.KeyE] {
-		g.Bananas.Add().SetPosition(g.mouse)
+		g.Bananas.Add().SetPosition(g.mouse.worldPos)
 	}
 	if g.Keys[glfw.KeyQ] {
-		g.Bombs.Add().SetPosition(g.mouse)
+		g.Bombs.Add().SetPosition(g.mouse.worldPos)
 	}
 	if g.Keys[glfw.KeyF] {
 		g.fullscreen = !g.fullscreen
@@ -425,5 +406,5 @@ func (g *Game) joystickCallback(joy, event int) {
 
 func (g *Game) mouseMoveCallback(w *glfw.Window, xpos float64, ypos float64) {
 	ww, wh := w.GetSize()
-	g.mouse = g.MouseToSpace(xpos, ypos, ww, wh)
+	g.mouse.worldPos = g.MouseToSpace(xpos, ypos, ww, wh)
 }
