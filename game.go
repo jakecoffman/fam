@@ -95,6 +95,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.gui = NewGui(g)
 	g.Keys = [1024]bool{}
 	g.mouse.New()
+	g.level = "assets/levels/initial.json"
 
 	g.ResourceManager = eng.NewResourceManager()
 
@@ -230,7 +231,7 @@ func (g *Game) reset() {
 	g.Bombs = NewBombSystem(g)
 	g.Walls = NewWallSystem(g)
 
-	if err := g.loadLevel("assets/levels/initial.json"); err != nil {
+	if err := g.Walls.loadLevel(g.level); err != nil {
 		panic(err)
 	}
 }
@@ -245,7 +246,7 @@ func (g *Game) MouseToSpace(x, y float64, ww, wh int) cp.Vector {
 	return cp.Vector{float64(obj.X()), float64(obj.Y())}
 }
 
-func (g *Game) saveLevel(filename string) {
+func (s *WallSystem) saveLevel(filename string) {
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
@@ -255,7 +256,7 @@ func (g *Game) saveLevel(filename string) {
 		A, B cp.Vector
 	}
 	var data []entry
-	walls := g.Walls.pool.([]Wall)
+	walls := s.pool.([]Wall)
 	for _, w := range walls {
 		data = append(data, entry{w.A(), w.B()})
 	}
@@ -264,7 +265,7 @@ func (g *Game) saveLevel(filename string) {
 	}
 }
 
-func (g *Game) loadLevel(name string) error {
+func (s *WallSystem) loadLevel(name string) error {
 	file, err := os.Open(name)
 	if err != nil {
 		log.Println(err)
@@ -279,9 +280,12 @@ func (g *Game) loadLevel(name string) error {
 		return err
 	}
 
+	s.active = 0
+	s.lookup = map[eng.EntityID]int{}
+
 	for _, w := range data {
-		wall := g.Walls.Add(w.A, w.B)
-		g.Space.AddShape(wall.Shape)
+		wall := s.Add(w.A, w.B)
+		s.game.Space.AddShape(wall.Shape)
 	}
 
 	return nil

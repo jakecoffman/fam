@@ -143,7 +143,7 @@ func (gui *Gui) renderMainMenu() {
 		if err != nil {
 			log.Println(err)
 		} else {
-			gui.game.saveLevel(filename)
+			gui.game.Walls.saveLevel(filename)
 		}
 	}
 
@@ -154,7 +154,8 @@ func (gui *Gui) renderMainMenu() {
 		if err != nil {
 			log.Println(err)
 		} else {
-			_ = gui.game.loadLevel(filename)
+			gui.game.level = filename
+			_ = gui.game.Walls.loadLevel(filename)
 		}
 	}
 
