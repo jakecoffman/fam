@@ -1,16 +1,14 @@
 package fam
 
 import (
-	"log"
-
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/eng"
 )
 
 type BombSystem struct {
+	*System
 	game     *Game
-	bombs    map[eng.EntityID]*Bomb
 	renderer *eng.SpriteRenderer
 
 	texture, powTexture *eng.Texture2D
@@ -18,14 +16,15 @@ type BombSystem struct {
 
 func NewBombSystem(g *Game) *BombSystem {
 	const (
+		maxBombs       = 100
 		bombTexture    = "bomb"
 		bombPowTexture = "pow"
 	)
 	s := &BombSystem{
+		System:     NewSystem(Bomb{}, maxBombs),
 		game:       g,
 		texture:    g.Texture(bombTexture),
 		powTexture: g.Texture(bombPowTexture),
-		bombs:      map[eng.EntityID]*Bomb{},
 		renderer:   g.SpriteRenderer,
 	}
 	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
@@ -50,7 +49,7 @@ func NewBombSystem(g *Game) *BombSystem {
 }
 
 type Bomb struct {
-	*eng.Object
+	Object
 	Circle *cp.Circle
 
 	state bombState
@@ -65,10 +64,8 @@ const (
 	bombStateGone
 )
 
-func (s *BombSystem) Add() *eng.Object {
-	p := &Bomb{}
-	p.Object = s.game.Objects.Add(s.game.Space)
-	s.bombs[p.ID] = p
+func (s *BombSystem) Add() *Object {
+	p := s.System.Add().(*Bomb)
 
 	p.state = bombStateOk
 	p.time = 0
@@ -86,17 +83,14 @@ func (s *BombSystem) Add() *eng.Object {
 	p.Circle = p.Shape.Class.(*cp.Circle)
 	s.game.Space.AddBody(p.Body)
 	s.game.Space.AddShape(p.Shape)
-	return p.Object
-}
-
-func (s *BombSystem) Remove(id eng.EntityID) {
-	log.Println("Removing bomb", id)
-	s.game.Objects.Remove(id)
-	delete(s.bombs, id)
+	return &p.Object
 }
 
 func (s *BombSystem) Update(dt float64) {
-	for _, p := range s.bombs {
+	bombs := s.pool.([]Bomb)
+	for i := 0; i < s.active; i++ {
+		p := &bombs[i]
+		p.Update(dt)
 		p.time += dt
 
 		const explosionSizeIncrease = 10
@@ -115,7 +109,9 @@ func (s *BombSystem) Update(dt float64) {
 }
 
 func (s *BombSystem) Draw(alpha float64) {
-	for _, p := range s.bombs {
+	bombs := s.pool.([]Bomb)
+	for i := 0; i < s.active; i++ {
+		p := &bombs[i]
 		if p.state == bombStateGone {
 			return
 		}
@@ -138,4 +134,9 @@ func (s *BombSystem) Draw(alpha float64) {
 
 		s.renderer.DrawSprite(texture, p.SmoothPos(alpha), p.Size().Mul(2), p.Angle(), color)
 	}
+}
+
+func (s *BombSystem) Remove(id eng.EntityID) {
+	s.System.Get(id).(*Bomb).Remove(s.game.Space)
+	s.System.Remove(id)
 }

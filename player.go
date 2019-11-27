@@ -2,7 +2,6 @@ package fam
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -11,14 +10,14 @@ import (
 )
 
 type PlayerSystem struct {
+	*System
 	game *Game
-	players map[eng.EntityID]*Player
 }
 
 type Player struct {
-	Color   mgl32.Vec3
+	Object
 
-	*eng.Object
+	Color   mgl32.Vec3
 	Circle *cp.Circle
 
 	Joystick glfw.Joystick
@@ -28,21 +27,20 @@ type Player struct {
 }
 
 func NewPlayerSystem(game *Game) *PlayerSystem {
+	const maxPlayers = 16
 	return &PlayerSystem{
+		System: NewSystem(Player{}, maxPlayers),
 		game: game,
-		players: map[eng.EntityID]*Player{},
 	}
 }
 
 const playerRadius = 25.0
 
 func (s *PlayerSystem) Add(pos cp.Vector, color mgl32.Vec3, joystick glfw.Joystick) *Player {
-	p := &Player{
-		Color: color,
-		Joystick: joystick,
-	}
-	p.Object = s.game.Objects.Add(s.game.Space)
-	s.players[p.ID] = p
+	p := s.System.Add().(*Player)
+	p.Color = color
+	p.Joystick = joystick
+
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, playerRadius, playerRadius, cp.Vector{0, 0}))
 	p.Body.SetVelocityUpdateFunc(playerUpdateVelocity(s.game, p))
 
@@ -62,25 +60,15 @@ func (s *PlayerSystem) Add(pos cp.Vector, color mgl32.Vec3, joystick glfw.Joysti
 	return p
 }
 
-func (s *PlayerSystem) Reset() {
-	oldPlayers := s.players
-	s.players = map[eng.EntityID]*Player{}
-	pos := cp.Vector{centerOfWorld.X + rand.Float64()*10, centerOfWorld.Y + rand.Float64()*10}
-	for id, p := range oldPlayers {
-		if p.Joystick >= 0 {
-			s.Add(pos, p.Color, p.Joystick)
-		}
-		delete(oldPlayers, id)
-	}
-}
-
 func (s *PlayerSystem) Update(dt float64) {
-	for _, p := range s.players {
-		p.Update(s.game, dt)
+	players := s.pool.([]Player)
+	for i := 0; i < s.active; i++ {
+		players[i].Update(s.game, dt)
 	}
 }
 
 func (p *Player) Update(g *Game, dt float64) {
+	p.Object.Update(dt)
 	var jumpState bool
 	if p.Joystick > -1 {
 		buttonBytes := glfw.GetJoystickButtons(p.Joystick)
@@ -102,8 +90,9 @@ func (p *Player) Update(g *Game, dt float64) {
 }
 
 func (s *PlayerSystem) Draw(alpha float64) {
-	for _, p := range s.players {
-		p.Draw(s.game, alpha)
+	players := s.pool.([]Player)
+	for i := 0; i < s.active; i++ {
+		players[i].Draw(s.game, alpha)
 	}
 }
 
@@ -114,6 +103,11 @@ func (p *Player) Draw(g *Game, alpha float64) {
 		p.Size().Mul(1.1), // increase 10% to better fit hitbox
 		p.Angle(),
 		p.Color)
+}
+
+func (s *PlayerSystem) Remove(id eng.EntityID) {
+	s.System.Get(id).(*Player).Remove(s.game.Space)
+	s.System.Remove(id)
 }
 
 const (

@@ -60,7 +60,6 @@ type Game struct {
 
 	Space *cp.Space
 
-	Objects *eng.ObjectSystem
 	Players *PlayerSystem
 	Bananas *BananaSystem
 	Bombs   *BombSystem
@@ -154,9 +153,8 @@ func (g *Game) Update(dt float64) {
 		return
 	}
 	g.Bombs.Update(dt)
-	//g.Bananas.Update(dt)
+	g.Bananas.Update(dt)
 	g.Players.Update(dt)
-	g.Objects.Update(dt, worldWidth, worldHeight)
 	g.Space.Step(dt)
 }
 
@@ -182,7 +180,7 @@ func (g *Game) Render(alpha float64) {
 
 	if g.state == gameStatePaused {
 		g.TextRenderer.Print("Paused (press P to unpause)", float64(g.window.Width)/2.-150., float64(g.window.Height)/2., 1)
-	} else if len(g.Players.players) == 0 {
+	} else if g.Players.active == 0 {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
 	}
 
@@ -213,13 +211,17 @@ func (g *Game) reset() {
 	g.Space.Iterations = 10
 	g.Space.SetGravity(cp.Vector{0, Gravity})
 
-	if g.Objects != nil {
-		g.Objects.Reset(g.Space)
-	} else {
-		g.Objects = eng.NewObjectSystem(g.Space)
-	}
 	if g.Players != nil {
-		g.Players.Reset()
+		newPlayerSystem := NewPlayerSystem(g)
+		oldPool := g.Players.pool.([]Player)
+		for i := 0; i < g.Players.active; i++ {
+			p := &oldPool[i]
+			if p.Joystick >= 0 {
+				pos := cp.Vector{centerOfWorld.X + rand.Float64()*10, centerOfWorld.Y + rand.Float64()*10}
+				newPlayerSystem.Add(pos, p.Color, p.Joystick)
+			}
+		}
+		g.Players = newPlayerSystem
 	} else {
 		g.Players = NewPlayerSystem(g)
 	}
@@ -253,7 +255,8 @@ func (g *Game) saveLevel(filename string) {
 		A, B cp.Vector
 	}
 	var data []entry
-	for _, w := range g.Walls.walls {
+	walls := g.Walls.pool.([]Wall)
+	for _, w := range walls {
 		data = append(data, entry{w.A(), w.B()})
 	}
 	if err = json.NewEncoder(file).Encode(data); err != nil {
@@ -392,7 +395,7 @@ func (g *Game) keyCallback(window *glfw.Window, key glfw.Key, scancode int, acti
 
 func (g *Game) joystickCallback(joy, event int) {
 	if glfw.MonitorEvent(event) == glfw.Connected {
-		if joy+1 <= len(g.Players.players) {
+		if joy+1 <= g.Players.active {
 			log.Println("Joystick reconnected", joy)
 			return
 		}

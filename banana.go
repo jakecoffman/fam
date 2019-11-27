@@ -7,21 +7,23 @@ import (
 )
 
 type BananaSystem struct {
+	*System
+
 	texture  *eng.Texture2D
 	game     *Game
-	bananas  map[eng.EntityID]*Banana
 	renderer *eng.SpriteRenderer
 }
 
 type Banana struct {
-	*eng.Object
+	Object
 }
 
 func NewBananaSystem(g *Game) *BananaSystem {
+	const maxBanana = 100
 	s := &BananaSystem{
+		System:   NewSystem(Banana{}, maxBanana),
 		game:     g,
 		texture:  g.Texture("banana"),
-		bananas:  map[eng.EntityID]*Banana{},
 		renderer: g.SpriteRenderer,
 	}
 	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
@@ -49,16 +51,23 @@ func NewBananaSystem(g *Game) *BananaSystem {
 	return s
 }
 
+func (s *BananaSystem) Update(dt float64) {
+	bananas := s.pool.([]Banana)
+	for i := 0; i < s.active; i++ {
+		bananas[i].Update(dt)
+	}
+}
+
 func (s *BananaSystem) Draw(alpha float64) {
-	for _, p := range s.bananas {
+	bananas := s.pool.([]Banana)
+	for i := 0; i < s.active; i++ {
+		p := &bananas[i]
 		s.renderer.DrawSprite(s.texture, p.SmoothPos(alpha), p.Size(), p.Angle(), mgl32.Vec3{1, 1, 1})
 	}
 }
 
-func (s *BananaSystem) Add() *eng.Object {
-	p := &Banana{}
-	p.Object = s.game.Objects.Add(p)
-	s.bananas[p.ID] = p
+func (s *BananaSystem) Add() *Object {
+	p := s.System.Add().(*Banana)
 
 	const (
 		bananaMass   = 10
@@ -76,10 +85,10 @@ func (s *BananaSystem) Add() *eng.Object {
 	p.Shape.UserData = p.ID
 	s.game.Space.AddBody(p.Body)
 	s.game.Space.AddShape(p.Shape)
-	return p.Object
+	return &p.Object
 }
 
 func (s *BananaSystem) Remove(id eng.EntityID) {
-	s.game.Objects.Remove(id)
-	delete(s.bananas, id)
+	s.System.Get(id).(*Banana).Remove(s.game.Space)
+	s.System.Remove(id)
 }
