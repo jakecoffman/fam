@@ -6,7 +6,6 @@ import (
 )
 
 // Walls have no body of their own, they use the global static body, so this does not use Object
-
 type WallSystem struct {
 	*System
 
@@ -42,12 +41,17 @@ const (
 )
 
 func (s *WallSystem) Add(a, b cp.Vector) *Wall {
+	// don't add to space because we might be in a callback
+	ptr, ok := s.System.Add()
+	p := ptr.(*Wall)
+	if !ok {
+		return p
+	}
+
 	seg := cp.NewSegment(s.game.Space.StaticBody, a, b, wallWidth)
 	seg.SetElasticity(1)
 	seg.SetFriction(wallFriction)
 	seg.SetCollisionType(collisionWall)
-	// don't add to space because we might be in a callback
-	p := s.System.Add().(*Wall)
 	p.Segment = seg.Class.(*cp.Segment)
 	seg.UserData = p.ID
 	return p

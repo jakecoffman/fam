@@ -67,7 +67,11 @@ func (s *BananaSystem) Draw(alpha float64) {
 }
 
 func (s *BananaSystem) Add() *Object {
-	p := s.System.Add().(*Banana)
+	ptr, ok := s.System.Add()
+	p := ptr.(*Banana)
+	if !ok {
+		return &p.Object
+	}
 
 	const (
 		bananaMass   = 10

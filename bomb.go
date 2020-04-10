@@ -65,7 +65,11 @@ const (
 )
 
 func (s *BombSystem) Add() *Object {
-	p := s.System.Add().(*Bomb)
+	ptr, ok := s.System.Add()
+	p := ptr.(*Bomb)
+	if !ok {
+		return &p.Object
+	}
 
 	p.state = bombStateOk
 	p.time = 0

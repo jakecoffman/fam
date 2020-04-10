@@ -1,7 +1,6 @@
 package fam
 
 import (
-	"log"
 	"reflect"
 
 	"github.com/jakecoffman/eng"
@@ -28,10 +27,12 @@ func NewSystem(obj interface{}, maxAmount int) *System {
 	}
 }
 
-func (s *System) Add() interface{} {
+func (s *System) Add() (interface{}, bool) {
 	poolSlice := reflect.ValueOf(s.pool)
 	if s.active >= s.maxAmount {
-		log.Panic("Too many entities:", s.maxAmount)
+		// we've reached our max so instead of crashing return the last one
+		item := poolSlice.Index(s.active-1)
+		return item.Addr().Interface(), false
 	}
 	item := poolSlice.Index(s.active)
 	id := eng.NextEntityID()
@@ -39,7 +40,7 @@ func (s *System) Add() interface{} {
 	p := item.Addr().Interface()
 	s.lookup[id] = s.active
 	s.active++
-	return p
+	return p, true
 }
 
 func (s *System) Get(id eng.EntityID) interface{} {

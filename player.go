@@ -37,7 +37,11 @@ func NewPlayerSystem(game *Game) *PlayerSystem {
 const playerRadius = 25.0
 
 func (s *PlayerSystem) Add(pos cp.Vector, color mgl32.Vec3, joystick glfw.Joystick) *Player {
-	p := s.System.Add().(*Player)
+	ptr, ok := s.System.Add()
+	p := ptr.(*Player)
+	if !ok {
+		return p
+	}
 	p.Color = color
 	p.Joystick = joystick
 
