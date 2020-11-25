@@ -37,6 +37,9 @@ func NewBananaSystem(g *Game) *BananaSystem {
 		switch b.UserData.(type) {
 		case *Player:
 			player := b.UserData.(*Player)
+			if player.Circle.Radius() >= playerRadius*5 {
+				return true
+			}
 			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 
 			space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
