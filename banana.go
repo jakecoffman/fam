@@ -27,23 +27,20 @@ func NewBananaSystem(g *Game) *BananaSystem {
 		renderer: g.SpriteRenderer,
 	}
 	bananaCollisionHandler := s.game.Space.NewCollisionHandler(collisionBanana, collisionPlayer)
-	bananaCollisionHandler.UserData = s.game
-	bananaCollisionHandler.PreSolveFunc = func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
-		game := data.(*Game)
+	bananaCollisionHandler.PreSolveFunc = func(arb *cp.Arbiter, space *cp.Space, _ interface{}) bool {
 
 		a, b := arb.Shapes()
-		bid := a.UserData.(eng.EntityID)
+		banana := a.UserData.(*Banana)
 
-		switch b.UserData.(type) {
+		switch v := b.UserData.(type) {
 		case *Player:
-			player := b.UserData.(*Player)
-			if player.Circle.Radius() >= playerRadius*5 {
+			if v.Circle.Radius() >= playerRadius*5 {
 				return true
 			}
-			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
+			v.Circle.SetRadius(v.Circle.Radius() * 1.1)
 
 			space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
-				game.Bananas.Remove(bid)
+				g.Bananas.Remove(banana.ID)
 			}, nil, nil)
 
 			return false
@@ -89,7 +86,7 @@ func (s *BananaSystem) Add() *Object {
 	p.Shape.SetCollisionType(collisionBanana)
 	p.Shape.SetFilter(PlayerFilter)
 
-	p.Shape.UserData = p.ID
+	p.Shape.UserData = p
 	s.game.Space.AddBody(p.Body)
 	s.game.Space.AddShape(p.Shape)
 	return &p.Object

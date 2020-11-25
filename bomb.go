@@ -27,7 +27,7 @@ func NewBombSystem(g *Game) *BombSystem {
 		powTexture: g.Texture(bombPowTexture),
 		renderer:   g.SpriteRenderer,
 	}
-	bombCollisionHandler := s.game.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
+	bombCollisionHandler := s.game.Space.NewWildcardCollisionHandler(collisionBomb)
 	bombCollisionHandler.PreSolveFunc = func(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 		a, b := arb.Shapes()
 
@@ -36,11 +36,14 @@ func NewBombSystem(g *Game) *BombSystem {
 			return true
 		}
 
-		switch b.UserData.(type) {
+		switch v := b.UserData.(type) {
 		case *Player:
-			player := b.UserData.(*Player)
-			player.Circle.SetRadius(playerRadius)
-			return true
+			v.Circle.SetRadius(playerRadius)
+			v.SetVelocityVector(arb.Normal().Normalize().Mult(1000.))
+		case *Banana:
+			v.SetVelocityVector(arb.Normal().Normalize().Mult(1000.))
+		case *Bomb:
+			v.SetVelocityVector(arb.Normal().Normalize().Mult(1000.))
 		}
 
 		return true

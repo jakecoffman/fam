@@ -50,12 +50,15 @@ func (p *Object) SmoothPos(alpha float64) mgl32.Vec2 {
 func (p *Object) Size() mgl32.Vec2 {
 	bb := p.Shape.BB()
 	return mgl32.Vec2{
-		float32(bb.R-bb.L),
-		float32(bb.T-bb.B),
+		float32(bb.R - bb.L),
+		float32(bb.T - bb.B),
 	}
 }
 
 func (p *Object) Remove(space *cp.Space) {
+	if p == nil || p.Shape == nil {
+		return
+	}
 	p.Shape.UserData = nil
 	p.Body.UserData = nil
 	space.RemoveShape(p.Shape)

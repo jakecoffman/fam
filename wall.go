@@ -53,7 +53,7 @@ func (s *WallSystem) Add(a, b cp.Vector) *Wall {
 	seg.SetFriction(wallFriction)
 	seg.SetCollisionType(collisionWall)
 	p.Segment = seg.Class.(*cp.Segment)
-	seg.UserData = p.ID
+	seg.UserData = p
 	return p
 }
 
