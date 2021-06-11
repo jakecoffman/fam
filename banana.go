@@ -62,6 +62,9 @@ func (s *BananaSystem) Draw(alpha float64) {
 	bananas := s.pool.([]Banana)
 	for i := 0; i < s.active; i++ {
 		p := &bananas[i]
+		if p == nil {
+			continue
+		}
 		s.renderer.DrawSprite(s.texture, p.SmoothPos(alpha), p.Size(), p.Angle(), mgl32.Vec3{1, 1, 1})
 	}
 }
