@@ -40,6 +40,9 @@ func (p *Object) Update(dt float64) {
 }
 
 func (p *Object) SmoothPos(alpha float64) mgl32.Vec2 {
+	if p == nil {
+		return mgl32.Vec2{}
+	}
 	pos := p.Position()
 	if p.lastPosition != nil {
 		pos = pos.Mult(alpha).Add(p.lastPosition.Mult(1.0 - alpha))
