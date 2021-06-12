@@ -6,11 +6,11 @@ a simple game to play with the kids
 
 ### Windows
 
-TODO
+Install the GCC toolchain via Mingw-w64.
 
 ### Mac
 
-TODO
+Install XCode or something, you'll figure it out.
 
 ### Ubuntu
 
