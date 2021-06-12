@@ -23,17 +23,18 @@ func (p *Object) Update(dt, worldWidth, worldHeight float64) {
 	pos := p.Position()
 	p.lastPosition = &pos
 
-	if pos.X < -5 {
-		pos.X = worldWidth
+	bb := p.BB()
+	if bb.R < 0 {
+		pos.X = worldWidth + (bb.R-bb.L)/2
 	}
-	if pos.X > worldWidth + 5 {
-		pos.X = 0
+	if bb.L > worldWidth {
+		pos.X = -(bb.R - bb.L) / 2
 	}
-	if pos.Y < -5 {
-		pos.Y = worldHeight
+	if bb.T < 0 {
+		pos.Y = worldHeight - (bb.B-bb.T)/2
 	}
-	if pos.Y > worldHeight + 5 {
-		pos.Y = 0
+	if bb.B > worldHeight {
+		pos.Y = (bb.B - bb.T) / 2
 	}
 	if !pos.Equal(p.Position()) {
 		p.SetPosition(pos)
@@ -53,7 +54,7 @@ func (p *Object) SmoothPos(alpha float64) mgl32.Vec2 {
 func (p *Object) Size() mgl32.Vec2 {
 	bb := p.Shape.BB()
 	return mgl32.Vec2{
-		float32(bb.R-bb.L),
-		float32(bb.T-bb.B),
+		float32(bb.R - bb.L),
+		float32(bb.T - bb.B),
 	}
 }
