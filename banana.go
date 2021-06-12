@@ -16,7 +16,7 @@ type Banana struct {
 
 func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.Space) *Banana {
 	p := &Banana{
-		Object: &eng.Object{},
+		Object:  &eng.Object{},
 		Texture: sprite,
 	}
 	const bananaMass = 10
@@ -54,6 +54,10 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	case *Player:
 		player := b.UserData.(*Player)
 
+		if player.Circle.Radius() >= playerRadius*5 {
+			// max size reached
+			return true
+		}
 		player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
