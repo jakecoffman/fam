@@ -105,12 +105,18 @@ func BombPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 		return true
 	}
 
+	multiplier := 10.
 	switch b.UserData.(type) {
 	case *Player:
 		player := b.UserData.(*Player)
 		player.Circle.SetRadius(playerRadius)
-		return true
+	case *Bomb:
+		// since bombs are so light
+		multiplier = .25
 	}
+
+	diff := b.Body().Position().Sub(a.Body().Position())
+	b.Body().ApplyImpulseAtLocalPoint(diff.Mult(multiplier), arb.Normal())
 
 	return true
 }

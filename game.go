@@ -329,6 +329,7 @@ func (g *Game) Update(dt float64) {
 	for i := len(g.Bombs) - 1; i >= 0; i-- {
 		if g.Bombs[i].state == bombStateGone {
 			g.Bombs = g.Bombs[i+1:]
+			break
 		}
 	}
 	for i := range g.Bananas {
@@ -407,7 +408,7 @@ func (g *Game) reset() {
 	bananaCollisionHandler.PreSolveFunc = BananaPreSolve
 	bananaCollisionHandler.UserData = g
 
-	bombCollisionHandler := g.Space.NewCollisionHandler(collisionBomb, collisionPlayer)
+	bombCollisionHandler := g.Space.NewWildcardCollisionHandler(collisionBomb)
 	bombCollisionHandler.PreSolveFunc = BombPreSolve
 
 	g.Space.NewWildcardCollisionHandler(collisionWall).PreSolveFunc = WallPreSolve
