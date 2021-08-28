@@ -81,6 +81,7 @@ type Game struct {
 	shouldRenderCp bool
 
 	chaseBananaMode bool
+	randomBombMode  bool
 
 	level string
 }
@@ -296,6 +297,12 @@ func (g *Game) Update(dt float64) {
 		banana := NewBanana(cp.Vector{float64(x), float64(y)}, 20, g.Texture("banana"), g.Space)
 		g.Bananas = append(g.Bananas, banana)
 	}
+	if g.randomBombMode && len(g.Bombs) == 0 {
+		x := rand.Intn(worldWidth)
+		y := rand.Intn(worldHeight)
+		bomb := NewBomb(cp.Vector{float64(x), float64(y)}, 20, g.Space)
+		g.Bombs = append(g.Bombs, bomb)
+	}
 
 	// update mouse body
 	newPoint := g.mouseBody.Position().Lerp(g.mouse, 0.25)
@@ -311,6 +318,11 @@ func (g *Game) Update(dt float64) {
 
 	for i := range g.Bombs {
 		g.Bombs[i].Update(g, dt)
+	}
+	for i := len(g.Bombs) - 1; i >= 0; i-- {
+		if g.Bombs[i].state == bombStateGone {
+			g.Bombs = g.Bombs[i+1:]
+		}
 	}
 	for i := range g.Bananas {
 		g.Bananas[i].Update(g, dt)
