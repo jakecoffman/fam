@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -43,6 +44,10 @@ const (
 	collisionBomb
 	collisionWall
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type Game struct {
 	state      int
@@ -295,12 +300,14 @@ func (g *Game) Update(dt float64) {
 		x := rand.Intn(worldWidth)
 		y := rand.Intn(worldHeight)
 		banana := NewBanana(cp.Vector{float64(x), float64(y)}, 20, g.Texture("banana"), g.Space)
+		banana.SetVelocity(float64(rand.Intn(2000)-1000), float64(rand.Intn(2000)-1000))
 		g.Bananas = append(g.Bananas, banana)
 	}
 	if g.randomBombMode && len(g.Bombs) == 0 {
 		x := rand.Intn(worldWidth)
 		y := rand.Intn(worldHeight)
 		bomb := NewBomb(cp.Vector{float64(x), float64(y)}, 20, g.Space)
+		bomb.SetVelocity(float64(rand.Intn(2000)-1000), float64(rand.Intn(2000)-1000))
 		g.Bombs = append(g.Bombs, bomb)
 	}
 
