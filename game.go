@@ -321,7 +321,7 @@ func (g *Game) Render(alpha float64) {
 		log.Printf("update viewport %#v\n", g.window)
 	}
 
-	g.SpriteRenderer.DrawSprite(g.Texture("background"), mgl32.Vec2{worldWidth/2, worldHeight/2}, mgl32.Vec2{worldWidth, worldHeight}, 0, eng.White)
+	g.SpriteRenderer.DrawSprite(g.Texture("background"), mgl32.Vec2{worldWidth / 2, worldHeight / 2}, mgl32.Vec2{worldWidth, worldHeight}, 0, eng.White)
 
 	{
 		g.CPRenderer.Clear()
@@ -390,10 +390,17 @@ func (g *Game) reset() {
 		panic(err)
 	}
 
+	var players []*Player
 	for _, p := range g.Players {
+		if p.Joystick == glfw.Joystick(-1) {
+			// remove players created with "enter" for when the kids make too many players
+			continue
+		}
 		pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
 		p.Reset(pos, playerRadius, g)
+		players = append(players, p)
 	}
+	g.Players = players
 	g.Bananas = []*Banana{}
 	g.Bombs = []*Bomb{}
 }
