@@ -148,6 +148,7 @@ func (gui *Gui) Render() {
 			gui.game.reset()
 		}
 
+		imgui.Checkbox("Chase Banana", &gui.game.chaseBananaMode)
 		imgui.Checkbox("Render Physics", &gui.game.shouldRenderCp)
 		if imgui.Checkbox("Vsync", &gui.game.vsync) {
 			if gui.game.vsync {

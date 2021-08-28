@@ -80,6 +80,8 @@ type Game struct {
 
 	shouldRenderCp bool
 
+	chaseBananaMode bool
+
 	level string
 }
 
@@ -287,6 +289,14 @@ func (g *Game) Update(dt float64) {
 	if g.state == statePause {
 		return
 	}
+
+	if g.chaseBananaMode && len(g.Bananas) == 0 {
+		x := rand.Intn(worldWidth)
+		y := rand.Intn(worldHeight)
+		banana := NewBanana(cp.Vector{float64(x), float64(y)}, 20, g.Texture("banana"), g.Space)
+		g.Bananas = append(g.Bananas, banana)
+	}
+
 	// update mouse body
 	newPoint := g.mouseBody.Position().Lerp(g.mouse, 0.25)
 	g.mouseBody.SetVelocityVector(newPoint.Sub(g.mouseBody.Position()).Mult(60.0))
