@@ -18,7 +18,10 @@ type Banana struct {
 
 func NewBanana(g *Game, pos cp.Vector, radius float64) *Banana {
 	texture := g.Texture("banana")
-	if rand.Intn(10) < 3 {
+	v := rand.Intn(10)
+	if v < 1 {
+		texture = g.Texture("strawberry")
+	} else if v < 4 {
 		texture = g.Texture("blueberry")
 	}
 
