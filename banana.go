@@ -4,9 +4,11 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/jakecoffman/cp"
 	"github.com/jakecoffman/fam/eng"
+	"math/rand"
 )
 
 type Banana struct {
+	Game    *Game
 	Texture *eng.Texture2D
 
 	*eng.Object
@@ -14,10 +16,16 @@ type Banana struct {
 	lastPosition *cp.Vector
 }
 
-func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.Space) *Banana {
+func NewBanana(g *Game, pos cp.Vector, radius float64) *Banana {
+	texture := g.Texture("banana")
+	if rand.Intn(10) < 3 {
+		texture = g.Texture("blueberry")
+	}
+
 	p := &Banana{
+		Game:    g,
 		Object:  &eng.Object{},
-		Texture: sprite,
+		Texture: texture,
 	}
 	const bananaMass = 10
 	p.Body = cp.NewBody(bananaMass, cp.MomentForCircle(bananaMass, radius, radius, cp.Vector{0, 0}))
@@ -31,8 +39,8 @@ func NewBanana(pos cp.Vector, radius float64, sprite *eng.Texture2D, space *cp.S
 
 	p.Shape.UserData = p
 	p.Body.SetPosition(pos)
-	space.AddBody(p.Body)
-	space.AddShape(p.Shape)
+	g.Space.AddBody(p.Body)
+	g.Space.AddShape(p.Shape)
 	return p
 }
 

@@ -192,7 +192,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			}
 		}
 		if g.Keys[glfw.KeyE] {
-			g.Bananas = append(g.Bananas, NewBanana(g.mouse, 20, g.Texture("banana"), g.Space))
+			g.Bananas = append(g.Bananas, NewBanana(g, g.mouse, 20))
 		}
 		if g.Keys[glfw.KeyQ] {
 			g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
@@ -299,7 +299,7 @@ func (g *Game) Update(dt float64) {
 	if g.chaseBananaMode && len(g.Bananas) == 0 {
 		x := rand.Intn(worldWidth)
 		y := rand.Intn(worldHeight)
-		banana := NewBanana(cp.Vector{float64(x), float64(y)}, 20, g.Texture("banana"), g.Space)
+		banana := NewBanana(g, cp.Vector{float64(x), float64(y)}, 20)
 		banana.SetVelocity(float64(rand.Intn(2000)-1000), float64(rand.Intn(2000)-1000))
 		g.Bananas = append(g.Bananas, banana)
 	}
