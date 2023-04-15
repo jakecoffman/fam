@@ -65,11 +65,10 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	case *Player:
 		player := b.UserData.(*Player)
 
-		if player.Circle.Radius() >= playerRadius*5 {
-			// max size reached
-			return true
+		// max size reached
+		if player.Circle.Radius() < playerRadius*5 {
+			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 		}
-		player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
 			if banana.Shape == nil {
