@@ -11,5 +11,5 @@ require (
 	github.com/inkyblackness/imgui-go v1.10.0
 	github.com/jakecoffman/cp v0.1.0
 	github.com/sqweek/dialog v0.0.0-20190728103509-6254ed5b0d3c
-	golang.org/x/image v0.5.0
+	golang.org/x/image v0.10.0
 )
