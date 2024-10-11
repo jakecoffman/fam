@@ -1,7 +1,7 @@
 package fam
 
 import (
-	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/cp/v2"
 	"github.com/jakecoffman/fam/eng"
 )
 
@@ -10,7 +10,7 @@ type Wall struct {
 }
 
 const (
-	wallWidth = 10
+	wallWidth    = 10
 	wallFriction = 100
 )
 

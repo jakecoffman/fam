@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/cp/v2"
 )
 
 type CPRenderer struct {
@@ -55,7 +55,7 @@ const (
 
 var (
 	DefaultOutline = FColor{0, .2, .2, 1}
-	DefaultFill = FColor{.8, .8, .8, 1}
+	DefaultFill    = FColor{.8, .8, .8, 1}
 )
 
 type FColor struct {

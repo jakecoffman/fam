@@ -2,7 +2,7 @@ package eng
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/cp/v2"
 )
 
 var objectId int

@@ -5,12 +5,12 @@ import (
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/jakecoffman/cp"
+	"github.com/jakecoffman/cp/v2"
 	"github.com/jakecoffman/fam/eng"
 )
 
 type Player struct {
-	Color   mgl32.Vec3
+	Color mgl32.Vec3
 
 	*eng.Object
 	Circle *cp.Circle
@@ -19,14 +19,14 @@ type Player struct {
 
 	lastPosition *cp.Vector
 
-	remainingBoost float64
+	remainingBoost          float64
 	grounded, lastJumpState bool
 }
 
 func NewPlayer(pos cp.Vector, radius float64, g *Game) *Player {
 	p := &Player{
 		Object: &eng.Object{},
-		Color:   mgl32.Vec3{1, 1, 1},
+		Color:  mgl32.Vec3{1, 1, 1},
 	}
 	p.Reset(pos, radius, g)
 
