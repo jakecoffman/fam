@@ -8,16 +8,14 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
+// PhysicsDt is the fixed physics timestep (seconds per sub-step).
+const PhysicsDt = 1.0 / 120.0
+
 type Scene interface {
 	New(window *OpenGlWindow)
 	Render(float64)
 	Update(float64)
 	Close()
-}
-
-type Renderer interface {
-	Clear()
-	Flush()
 }
 
 func Run(scene Scene) {
@@ -48,22 +46,26 @@ func Run(scene Scene) {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	const dt = 1. / 180.
+	const dt = PhysicsDt
+	const maxAccumulator = dt * 5
+
 	currentTime := glfw.GetTime()
 	accumulator := 0.0
 
 	frames := 0
-	var lastFps float64
+	lastFps := glfw.GetTime()
 
 	scene.New(window)
+	defer scene.Close()
 
 	for !window.ShouldClose() {
 		frames++
 		glfw.PollEvents()
 
 		newTime := glfw.GetTime()
-		if newTime-lastFps > 1 {
-			window.SetTitle(fmt.Sprintf("Game | %d FPS", frames))
+		if elapsed := newTime - lastFps; elapsed >= 1 {
+			fps := float64(frames) / elapsed
+			window.SetTitle(fmt.Sprintf("Game | %d FPS", int(fps+0.5)))
 			frames = 0
 			lastFps = newTime
 		}
@@ -73,6 +75,10 @@ func Run(scene Scene) {
 		}
 		currentTime = newTime
 		accumulator += frameTime
+		// Cap the accumulator to avoid a "spiral of death" after stalls.
+		if accumulator > maxAccumulator {
+			accumulator = maxAccumulator
+		}
 
 		for accumulator >= dt {
 			scene.Update(dt)
@@ -86,6 +92,4 @@ func Run(scene Scene) {
 		scene.Render(alpha)
 		window.SwapBuffers()
 	}
-
-	scene.Close()
 }

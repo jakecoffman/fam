@@ -20,12 +20,12 @@ func NewParticle() *Particle {
 }
 
 type ParticleGenerator struct {
-	particles        []*Particle
-	lastUsedParticle int
-	Amount           int
-	Shader           *Shader
-	Texture          *Texture2D
-	VAO              uint32
+	particles []*Particle
+	freeList  []int // indices of dead particles (stack)
+	Amount    int
+	Shader    *Shader
+	Texture   *Texture2D
+	VAO       uint32
 }
 
 func NewParticleGenerator(shader *Shader, texture *Texture2D, amount int) *ParticleGenerator {
@@ -56,8 +56,10 @@ func NewParticleGenerator(shader *Shader, texture *Texture2D, amount int) *Parti
 	gl.VertexAttribPointer(0, 4, gl.FLOAT, false, 4*4, gl.PtrOffset(0))
 	gl.BindVertexArray(0)
 
+	particleGenerator.freeList = make([]int, 0, amount)
 	for i := 0; i < amount; i++ {
 		particleGenerator.particles = append(particleGenerator.particles, NewParticle())
+		particleGenerator.freeList = append(particleGenerator.freeList, i)
 	}
 
 	return particleGenerator
@@ -69,18 +71,25 @@ func (p *ParticleGenerator) Update(dt float64, position, velocity mgl32.Vec2, ne
 		p.respawnParticle(p.particles[unusedParticles], position, velocity, offset)
 	}
 	for i := 0; i < p.Amount; i++ {
-		p := p.particles[i]
-		p.Life -= dt
-		if p.Life > 0 {
-			p.Position = p.Position.Sub(p.Velocity.Mul(float32(dt)))
-			p.Color = p.Color.Sub(mgl32.Vec4{0, 0, 0, float32(dt) * 2.5})
+		particle := p.particles[i]
+		if particle.Life <= 0 {
+			continue
 		}
+		particle.Life -= dt
+		if particle.Life <= 0 {
+			// Particle just died — add to free list for reuse.
+			p.freeList = append(p.freeList, i)
+			continue
+		}
+		particle.Position = particle.Position.Add(particle.Velocity.Mul(float32(dt)))
+		particle.Color = particle.Color.Sub(mgl32.Vec4{0, 0, 0, float32(dt) * 2.5})
 	}
 }
 
 func (p *ParticleGenerator) Draw() {
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE)
 	p.Shader.Use()
+	// TODO: convert to instanced rendering for better GPU performance.
 	for _, particle := range p.particles {
 		if particle.Life > 0 {
 			p.Shader.SetVec2f("offset", particle.Position)
@@ -94,20 +103,16 @@ func (p *ParticleGenerator) Draw() {
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 }
 
+// firstUnusedParticle returns the index of a dead particle using a free-list.
+// Falls back to index 0 (reset it) if the free list is empty.
 func (p *ParticleGenerator) firstUnusedParticle() int {
-	for i := p.lastUsedParticle; i < p.Amount; i++ {
-		if p.particles[i].Life <= 0 {
-			p.lastUsedParticle = i
-			return i
-		}
+	if len(p.freeList) > 0 {
+		idx := p.freeList[len(p.freeList)-1]
+		p.freeList = p.freeList[:len(p.freeList)-1]
+		return idx
 	}
-	for i := 0; i < p.lastUsedParticle; i++ {
-		if p.particles[i].Life <= 0 {
-			p.lastUsedParticle = i
-			return i
-		}
-	}
-	p.lastUsedParticle = 0
+	// Fallback: reuse the oldest particle.
+	p.particles[0].Life = 0
 	return 0
 }
 
