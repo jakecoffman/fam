@@ -57,7 +57,7 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	if p.state == bombStateGone {
 		return
 	}
-	p.Object.Update(dt, worldWidth, worldHeight)
+	p.Object.Update(g.Space, dt, worldWidth, worldHeight)
 	p.time += dt
 	if p.time > 5 && p.state != bombStateBoom {
 		p.state = bombStateBoom

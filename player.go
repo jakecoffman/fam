@@ -17,10 +17,13 @@ type Player struct {
 
 	Joystick glfw.Joystick
 
-	lastPosition *cp.Vector
-
 	remainingBoost          float64
 	grounded, lastJumpState bool
+
+	// inputX and jumpHeld are polled once per frame in Update and consumed by
+	// the velocity callback (which may run multiple times per Step).
+	inputX   float64
+	jumpHeld bool
 }
 
 func NewPlayer(pos cp.Vector, radius float64, g *Game) *Player {
@@ -53,26 +56,52 @@ func (p *Player) Reset(pos cp.Vector, radius float64, g *Game) {
 }
 
 func (p *Player) Update(g *Game, dt float64) {
-	p.Object.Update(dt, worldWidth, worldHeight)
+	p.Object.Update(g.Space, dt, worldWidth, worldHeight)
 
-	var jumpState bool
+	// Poll input once per frame and stash results so that playerUpdateVelocity
+	// (which Chipmunk may invoke multiple times per Step) sees consistent state.
+	const deadzone = 0.15
 	if p.Joystick > -1 {
+		axes := glfw.GetJoystickAxes(p.Joystick)
+		if len(axes) >= 1 {
+			raw := float64(axes[0])
+			if math.Abs(raw) < deadzone {
+				p.inputX = 0
+			} else {
+				// Rescale the range [deadzone, 1] → [0, 1] so the full output
+				// range is available after dead-zone removal.
+				p.inputX = (raw - math.Copysign(deadzone, raw)) / (1 - deadzone)
+			}
+		} else {
+			p.inputX = 0
+		}
+
 		buttonBytes := glfw.GetJoystickButtons(p.Joystick)
 		if len(buttonBytes) > 0 {
-			jumpState = glfw.Action(buttonBytes[0]) == glfw.Press
+			p.jumpHeld = glfw.Action(buttonBytes[0]) == glfw.Press
+		} else {
+			p.jumpHeld = false
 		}
 	} else {
-		jumpState = g.Keys[glfw.KeySpace]
+		if g.Keys[glfw.KeyA] || g.Keys[glfw.KeyLeft] {
+			p.inputX = -1
+		} else if g.Keys[glfw.KeyD] || g.Keys[glfw.KeyRight] {
+			p.inputX = 1
+		} else {
+			p.inputX = 0
+		}
+		p.jumpHeld = g.Keys[glfw.KeySpace]
 	}
+
 	// If the jump key was just pressed this frame, jump!
-	if jumpState && !p.lastJumpState && p.grounded {
+	if p.jumpHeld && !p.lastJumpState && p.grounded {
 		jumpV := -math.Sqrt(2.0 * JumpHeight * Gravity)
 		p.SetVelocityVector(p.Velocity().Add(cp.Vector{0, jumpV}))
 
 		p.remainingBoost = JumpBoostHeight / jumpV
 	}
 	p.remainingBoost -= dt
-	p.lastJumpState = jumpState
+	p.lastJumpState = p.jumpHeld
 }
 
 func (p *Player) Draw(g *Game, alpha float64) {
@@ -80,7 +109,7 @@ func (p *Player) Draw(g *Game, alpha float64) {
 		g.Texture("face"),
 		p.SmoothPos(alpha),
 		p.Size().Mul(1.1), // increase 10% to better fit hitbox
-		p.Angle(),
+		p.SmoothAngle(alpha),
 		p.Color)
 }
 
@@ -97,42 +126,21 @@ const (
 	JumpBoostHeight = 955.0
 	FallVelocity    = 900.0
 	Gravity         = 2000.0
-
-	joystickSensitivity = 100
 )
 
 func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64, float64) {
 	return func(body *cp.Body, gravity cp.Vector, damping, dt float64) {
-		var jumpState bool
-		var x float64
+		// Use pre-polled input (set once per frame in Player.Update).
+		x := p.inputX
+		jumpState := p.jumpHeld
 
-		if p.Joystick > -1 {
-			axes := glfw.GetJoystickAxes(p.Joystick)
-			if len(axes) < 2 {
-				return
-			}
-
-			buttonBytes := glfw.GetJoystickButtons(p.Joystick)
-			if len(buttonBytes) > 0 {
-				jumpState = glfw.Action(buttonBytes[0]) == glfw.Press
-			}
-			x = math.Round(float64(axes[0])*joystickSensitivity) / joystickSensitivity
-		} else {
-			if g.Keys[glfw.KeyA] || g.Keys[glfw.KeyLeft] {
-				x = -1
-			}
-			if g.Keys[glfw.KeyD] || g.Keys[glfw.KeyRight] {
-				x = 1
-			}
-			jumpState = g.Keys[glfw.KeySpace]
-		}
-
-		// Grab the grounding normal from last frame
+		// Grab the grounding normal from last frame.
+		// Only count normals pointing sufficiently upward (n.Y > 0.7) to avoid
+		// wall-sticking letting the player jump off steep walls.
 		groundNormal := cp.Vector{}
 		body.EachArbiter(func(arb *cp.Arbiter) {
 			n := arb.Normal()
-
-			if n.Y > groundNormal.Y {
+			if n.Y > 0.7 && n.Y > groundNormal.Y {
 				groundNormal = n
 			}
 		})
@@ -153,28 +161,18 @@ func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64,
 		// Target horizontal speed for air/ground control
 		targetVx := PlayerVelocity * x
 
-		// Update the surface velocity and friction
-		// Note that the "feet" move in the opposite direction of the player.
-		v := p.Velocity()
-
-		//surfaceV := cp.Vector{-targetVx, v.Y}
-		//p.Shape.SetSurfaceV(surfaceV)
-
-		//if p.grounded {
-		//	p.Shape.SetFriction(PlayerGroundAccel / Gravity)
-		//} else {
-		//	p.Shape.SetFriction(0)
-		//}
-
 		// Apply air control if not grounded
-
+		v := p.Velocity()
 		if !p.grounded {
 			p.SetVelocity(cp.LerpConst(v.X, targetVx, PlayerAirAccel*dt), v.Y)
 		} else {
 			p.SetVelocity(targetVx, v.Y)
 		}
 
+		// Clamp only the downward (falling) velocity; upward jumps are not clamped.
 		v = body.Velocity()
-		body.SetVelocity(v.X, cp.Clamp(v.Y, -FallVelocity, FallVelocity))
+		if v.Y > FallVelocity {
+			body.SetVelocity(v.X, FallVelocity)
+		}
 	}
 }

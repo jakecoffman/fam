@@ -62,3 +62,12 @@ func (w *OpenGlWindow) SetFullscreen(fullscreen bool) {
 func (w *OpenGlWindow) Resize() {
 	w.UpdateViewport = true
 }
+
+// SetVsync enables or disables vertical synchronisation via GLFW swap interval.
+func (w *OpenGlWindow) SetVsync(enabled bool) {
+	if enabled {
+		glfw.SwapInterval(1)
+	} else {
+		glfw.SwapInterval(0)
+	}
+}

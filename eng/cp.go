@@ -13,6 +13,7 @@ type CPRenderer struct {
 	vao, vbo uint32
 
 	triangles []Triangle
+	verts     []cp.Vector // reusable scratch buffer for polygon verts
 }
 
 func NewCPRenderer(shader *Shader, projection mgl32.Mat4) *CPRenderer {
@@ -86,7 +87,10 @@ func (cpr *CPRenderer) DrawShape(shape *cp.Shape, outline, fill FColor) {
 		poly := shape.Class.(*cp.PolyShape)
 
 		count := poly.Count()
-		verts := make([]cp.Vector, count)
+		if cap(cpr.verts) < count {
+			cpr.verts = make([]cp.Vector, count)
+		}
+		verts := cpr.verts[:count]
 
 		for i := 0; i < count; i++ {
 			verts[i] = poly.TransformVert(i)
@@ -210,12 +214,7 @@ func (cpr *CPRenderer) DrawFatSegment(a, b cp.Vector, radius float64, outline, f
 		Vertex{v5, vf{0, 1}, fill, outline},
 	}
 
-	cpr.triangles = append(cpr.triangles, t0)
-	cpr.triangles = append(cpr.triangles, t1)
-	cpr.triangles = append(cpr.triangles, t2)
-	cpr.triangles = append(cpr.triangles, t3)
-	cpr.triangles = append(cpr.triangles, t4)
-	cpr.triangles = append(cpr.triangles, t5)
+	cpr.triangles = append(cpr.triangles, t0, t1, t2, t3, t4, t5)
 }
 
 func (cpr *CPRenderer) DrawPolygon(count int, verts []cp.Vector, radius float64, outline, fill FColor) {
@@ -275,26 +274,28 @@ func (cpr *CPRenderer) DrawPolygon(count int, verts []cp.Vector, radius float64,
 		n1 := v2f(nB)
 		offset0 := v2f(offsetA)
 
-		cpr.triangles = append(cpr.triangles, Triangle{
-			Vertex{inner0, vf{}, fill, outline},
-			Vertex{inner1, vf{}, fill, outline},
-			Vertex{outer1, n1, fill, outline},
-		})
-		cpr.triangles = append(cpr.triangles, Triangle{
-			Vertex{inner0, vf{}, fill, outline},
-			Vertex{outer0, n1, fill, outline},
-			Vertex{outer1, n1, fill, outline},
-		})
-		cpr.triangles = append(cpr.triangles, Triangle{
-			Vertex{inner0, vf{}, fill, outline},
-			Vertex{outer0, n1, fill, outline},
-			Vertex{outer2, offset0, fill, outline},
-		})
-		cpr.triangles = append(cpr.triangles, Triangle{
-			Vertex{inner0, vf{}, fill, outline},
-			Vertex{outer2, offset0, fill, outline},
-			Vertex{outer3, n0, fill, outline},
-		})
+		cpr.triangles = append(cpr.triangles,
+			Triangle{
+				Vertex{inner0, vf{}, fill, outline},
+				Vertex{inner1, vf{}, fill, outline},
+				Vertex{outer1, n1, fill, outline},
+			},
+			Triangle{
+				Vertex{inner0, vf{}, fill, outline},
+				Vertex{outer0, n1, fill, outline},
+				Vertex{outer1, n1, fill, outline},
+			},
+			Triangle{
+				Vertex{inner0, vf{}, fill, outline},
+				Vertex{outer0, n1, fill, outline},
+				Vertex{outer2, offset0, fill, outline},
+			},
+			Triangle{
+				Vertex{inner0, vf{}, fill, outline},
+				Vertex{outer2, offset0, fill, outline},
+				Vertex{outer3, n0, fill, outline},
+			},
+		)
 
 		j = i
 		i++

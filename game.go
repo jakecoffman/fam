@@ -51,7 +51,7 @@ func init() {
 
 type Game struct {
 	state      int
-	Keys       [1024]bool
+	Keys       map[glfw.Key]bool
 	vsync      bool
 	fullscreen bool
 	window     *eng.OpenGlWindow
@@ -103,16 +103,16 @@ const (
 )
 
 const (
-	playerVelocity = 11250.0
-	playerRadius   = 25.0
+	playerRadius = 25.0
 )
 
 func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.vsync = true
 	g.window = openGlWindow
 	g.gui = NewGui(g)
-	g.Keys = [1024]bool{}
+	g.Keys = make(map[glfw.Key]bool)
 	g.mouseBody = cp.NewKinematicBody()
+	openGlWindow.SetVsync(g.vsync)
 
 	g.ResourceManager = eng.NewResourceManager()
 
@@ -209,12 +209,10 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			g.Players[i].Joystick = glfw.Joystick(-1)
 		}
 		// store for continuous application
-		if key >= 0 && key < 1024 {
-			if action == glfw.Press {
-				g.Keys[key] = true
-			} else if action == glfw.Release {
-				g.Keys[key] = false
-			}
+		if action == glfw.Press {
+			g.Keys[key] = true
+		} else if action == glfw.Release {
+			delete(g.Keys, key)
 		}
 	})
 
@@ -240,7 +238,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 					body := info.Shape.Body()
 					g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
 					g.mouseJoint.SetMaxForce(50000)
-					g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 60.0))
+					g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 1.0/eng.PhysicsDt))
 					g.Space.AddConstraint(g.mouseJoint)
 				} else {
 					leftDown := g.mouse.Clone()
@@ -313,7 +311,7 @@ func (g *Game) Update(dt float64) {
 
 	// update mouse body
 	newPoint := g.mouseBody.Position().Lerp(g.mouse, 0.25)
-	g.mouseBody.SetVelocityVector(newPoint.Sub(g.mouseBody.Position()).Mult(60.0))
+	g.mouseBody.SetVelocityVector(newPoint.Sub(g.mouseBody.Position()).Mult(1.0 / eng.PhysicsDt))
 	g.mouseBody.SetPosition(newPoint)
 
 	if g.leftDown != nil {
@@ -326,12 +324,14 @@ func (g *Game) Update(dt float64) {
 	for i := range g.Bombs {
 		g.Bombs[i].Update(g, dt)
 	}
-	for i := len(g.Bombs) - 1; i >= 0; i-- {
-		if g.Bombs[i].state == bombStateGone {
-			g.Bombs = g.Bombs[i+1:]
-			break
+	// Filter out gone bombs without discarding live ones.
+	out := g.Bombs[:0]
+	for _, b := range g.Bombs {
+		if b.state != bombStateGone {
+			out = append(out, b)
 		}
 	}
+	g.Bombs = out
 	for i := range g.Bananas {
 		g.Bananas[i].Update(g, dt)
 	}

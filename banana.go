@@ -12,8 +12,6 @@ type Banana struct {
 	Texture *eng.Texture2D
 
 	*eng.Object
-
-	lastPosition *cp.Vector
 }
 
 func NewBanana(g *Game, pos cp.Vector, radius float64) *Banana {
@@ -48,7 +46,7 @@ func NewBanana(g *Game, pos cp.Vector, radius float64) *Banana {
 }
 
 func (p *Banana) Update(g *Game, dt float64) {
-	p.Object.Update(dt, worldWidth, worldHeight)
+	p.Object.Update(g.Space, dt, worldWidth, worldHeight)
 }
 
 func (p *Banana) Draw(renderer *eng.SpriteRenderer, alpha float64) {
