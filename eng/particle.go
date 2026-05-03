@@ -104,14 +104,17 @@ func (p *ParticleGenerator) Draw() {
 }
 
 // firstUnusedParticle returns the index of a dead particle using a free-list.
-// Falls back to index 0 (reset it) if the free list is empty.
+// Falls back to index 0 when the free list is empty (i.e. all particles are
+// alive); it resets that particle so the oldest one is sacrificed for the new
+// spawn. This is safe because particle 0 is arbitrary — it just prevents
+// spawning from silently failing when the pool is exhausted.
 func (p *ParticleGenerator) firstUnusedParticle() int {
 	if len(p.freeList) > 0 {
 		idx := p.freeList[len(p.freeList)-1]
 		p.freeList = p.freeList[:len(p.freeList)-1]
 		return idx
 	}
-	// Fallback: reuse the oldest particle.
+	// Fallback: reuse the oldest particle (index 0).
 	p.particles[0].Life = 0
 	return 0
 }

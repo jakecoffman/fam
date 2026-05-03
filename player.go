@@ -68,6 +68,8 @@ func (p *Player) Update(g *Game, dt float64) {
 			if math.Abs(raw) < deadzone {
 				p.inputX = 0
 			} else {
+				// Rescale the range [deadzone, 1] → [0, 1] so the full output
+				// range is available after dead-zone removal.
 				p.inputX = (raw - math.Copysign(deadzone, raw)) / (1 - deadzone)
 			}
 		} else {
