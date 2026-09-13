@@ -10,7 +10,7 @@ require (
 	github.com/inkyblackness/imgui-go v1.12.0
 	github.com/jakecoffman/cp/v2 v2.0.2
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
-	golang.org/x/image v0.38.0
+	golang.org/x/image v0.41.0
 )
 
 require github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
