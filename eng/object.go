@@ -53,7 +53,7 @@ func (p *Object) Update(space *cp.Space, dt, worldWidth, worldHeight float64) {
 		// After teleporting, snap the interpolation origin too so there's no
 		// one-frame streak across the screen.
 		p.lastPosition = pos
-		space.ReindexShapesForBody(p.Body)
+		p.Body.EachShape(space.ReindexShape)
 	}
 }
 
