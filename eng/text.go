@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
-	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -17,18 +17,26 @@ import (
 
 type TextRenderer struct {
 	*Shader
-	vao, vbo uint32
-	fontChar []character
-	texture  uint32 // Holds the glyph texture id.
+	vao, vbo    uint32
+	fontChar    []character
+	texture     uint32
+	vertices    []float32
+	lastLayout  textLayout
+	layoutValid bool
 }
 
 type character struct {
-	textureID uint32 // ID handle of the glyph texture
-	width     int    //glyph width
-	height    int    //glyph height
-	advance   int    //glyph advance
-	bearingH  int    //glyph bearing horizontal
-	bearingV  int    //glyph bearing vertical
+	uvRect   mgl32.Vec4
+	width    int //glyph width
+	height   int //glyph height
+	advance  int //glyph advance
+	bearingH int //glyph bearing horizontal
+	bearingV int //glyph bearing vertical
+}
+
+type textLayout struct {
+	text        string
+	x, y, scale float32
 }
 
 func NewTextRenderer(shader *Shader, width, height float32, font string, scale uint32) *TextRenderer {
@@ -38,7 +46,6 @@ func NewTextRenderer(shader *Shader, width, height float32, font string, scale u
 	gl.GenBuffers(1, &VBO)
 	gl.BindVertexArray(VAO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
-	gl.BufferData(gl.ARRAY_BUFFER, 6*4*4, nil, gl.DYNAMIC_DRAW)
 
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 4, gl.FLOAT, false, 4*4, gl.PtrOffset(0))
@@ -56,36 +63,39 @@ func NewTextRenderer(shader *Shader, width, height float32, font string, scale u
 }
 
 func (t *TextRenderer) Load(fontPath string, scale uint32) error {
-	fd, err := os.Open(fontPath)
+	data, err := os.ReadFile(fontPath)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = fd.Close() }()
-
 	low := rune(32)
 	high := rune(127)
-
-	data, err := ioutil.ReadAll(fd)
-	if err != nil {
-		return err
-	}
 
 	ttf, err := truetype.Parse(data)
 	if err != nil {
 		return err
 	}
 
-	t.fontChar = make([]character, 0, high-low+1)
-	t.SetColor(1.0, 1.0, 1.0, 1.0)
+	characters := make([]character, 0, high-low+1)
+	images := make([]image.Image, 0, high-low+1)
+	ttfFace := truetype.NewFace(ttf, &truetype.Options{
+		Size:    float64(scale),
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	defer func() {
+		if err := ttfFace.Close(); err != nil {
+			log.Printf("closing font %q: %v", fontPath, err)
+		}
+	}()
+	c := freetype.NewContext()
+	c.SetDPI(72)
+	c.SetFont(ttf)
+	c.SetFontSize(float64(scale))
+	c.SetSrc(image.White)
+	c.SetHinting(font.HintingFull)
 
 	for ch := low; ch <= high; ch++ {
 		var char character
-
-		ttfFace := truetype.NewFace(ttf, &truetype.Options{
-			Size:    float64(scale),
-			DPI:     72,
-			Hinting: font.HintingFull,
-		})
 
 		gBnd, gAdv, ok := ttfFace.GlyphBounds(ch)
 		if ok != true {
@@ -115,19 +125,12 @@ func (t *TextRenderer) Load(fontPath string, scale uint32) error {
 		char.bearingV = gdescent
 		char.bearingH = int(gBnd.Min.X) >> 6
 
-		fg, bg := image.White, image.Black
 		rect := image.Rect(0, 0, int(gw), int(gh))
 		rgba := image.NewRGBA(rect)
-		draw.Draw(rgba, rgba.Bounds(), bg, image.Point{}, draw.Src)
+		draw.Draw(rgba, rgba.Bounds(), image.Black, image.Point{}, draw.Src)
 
-		c := freetype.NewContext()
-		c.SetDPI(72)
-		c.SetFont(ttf)
-		c.SetFontSize(float64(scale))
 		c.SetClip(rgba.Bounds())
 		c.SetDst(rgba)
-		c.SetSrc(fg)
-		c.SetHinting(font.HintingFull)
 
 		px := 0 - (int(gBnd.Min.X) >> 6)
 		py := gAscent
@@ -138,76 +141,96 @@ func (t *TextRenderer) Load(fontPath string, scale uint32) error {
 			return err
 		}
 
-		var texture uint32
-		gl.GenTextures(1, &texture)
-		gl.BindTexture(gl.TEXTURE_2D, texture)
-		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(rgba.Rect.Dx()), int32(rgba.Rect.Dy()), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(rgba.Pix))
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-
-		char.textureID = texture
-
-		t.fontChar = append(t.fontChar, char)
+		characters = append(characters, char)
+		images = append(images, rgba)
 	}
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	var maxSize int32
+	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE, &maxSize)
+	atlas, regions, err := packAtlas(images, int(maxSize), false)
+	if err != nil {
+		return err
+	}
+	texture := NewTexture()
+	texture.WrapS, texture.WrapT = gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE
+	texture.generateImage(atlas)
+	for i := range characters {
+		characters[i].uvRect = atlasUV(regions[i], texture.Width, texture.Height)
+	}
+	if t.texture != 0 {
+		gl.DeleteTextures(1, &t.texture)
+	}
+	t.texture = texture.ID
+	t.fontChar = characters
+	t.layoutValid = false
+	t.SetColor(1, 1, 1, 1)
 	return nil
 }
 
-//SetColor allows you to set the text color to be used when you draw the text
+// SetColor allows you to set the text color to be used when you draw the text
 func (t *TextRenderer) SetColor(red float32, green float32, blue float32, alpha float32) {
 	t.Use().SetVec4f("textColor", mgl32.Vec4{red, green, blue, alpha})
 }
 
-//Printf draws a string to the screen, takes a list of arguments like printf
+// Print draws one batched string, reusing its geometry when the layout is unchanged.
 func (t *TextRenderer) Print(text string, x64, y64 float64, scale float32) {
-	x, y := float32(x64), float32(y64)
-	indices := []rune(text)
-	if len(indices) == 0 {
+	changed := t.layout(text, float32(x64), float32(y64), scale)
+	if len(t.vertices) == 0 {
 		return
 	}
 	t.Use()
-
-	lowChar := rune(32)
-
 	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, t.texture)
 	gl.BindVertexArray(t.vao)
+	if changed {
+		gl.BindBuffer(gl.ARRAY_BUFFER, t.vbo)
+		gl.BufferData(gl.ARRAY_BUFFER, len(t.vertices)*4, gl.Ptr(t.vertices), gl.DYNAMIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	}
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(t.vertices)/4))
+	gl.BindVertexArray(0)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.UseProgram(0)
+}
 
-	for i := range indices {
-		runeIndex := indices[i]
+func (t *TextRenderer) layout(text string, x, y, scale float32) bool {
+	key := textLayout{text, x, y, scale}
+	if t.layoutValid && t.lastLayout == key {
+		return false
+	}
+	t.vertices = t.vertices[:0]
+	for _, r := range text {
+		index := int(r) - 32
 
-		if int(runeIndex)-int(lowChar) > len(t.fontChar) || runeIndex < lowChar {
+		if index < 0 || index >= len(t.fontChar) {
 			continue
 		}
 
-		ch := t.fontChar[runeIndex-lowChar]
+		ch := t.fontChar[index]
 
 		xpos := x + float32(ch.bearingH)*scale
 		ypos := y - float32(ch.height-ch.bearingV)*scale
 		w := float32(ch.width) * scale
 		h := float32(ch.height) * scale
 
-		var vertices = []float32{
-			xpos, ypos + h, 0.0, 1.0,
-			xpos + w, ypos, 1.0, 0.0,
-			xpos, ypos, 0.0, 0.0,
-			xpos, ypos + h, 0.0, 1.0,
-			xpos + w, ypos + h, 1.0, 1.0,
-			xpos + w, ypos, 1.0, 0.0,
-		}
-
-		gl.BindTexture(gl.TEXTURE_2D, ch.textureID)
-		gl.BindBuffer(gl.ARRAY_BUFFER, t.vbo)
-		gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(vertices)*4, gl.Ptr(vertices))
-
-		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-		gl.DrawArrays(gl.TRIANGLES, 0, 6)
+		uv := ch.uvRect
+		t.vertices = append(t.vertices,
+			xpos, ypos+h, uv[0], uv[3],
+			xpos+w, ypos, uv[2], uv[1],
+			xpos, ypos, uv[0], uv[1],
+			xpos, ypos+h, uv[0], uv[3],
+			xpos+w, ypos+h, uv[2], uv[3],
+			xpos+w, ypos, uv[2], uv[1],
+		)
 
 		x += float32(ch.advance>>6) * scale
 	}
-	gl.BindVertexArray(0)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.UseProgram(0)
-	return
+	t.lastLayout = key
+	t.layoutValid = true
+	return true
+}
+
+func (t *TextRenderer) Destroy() {
+	gl.DeleteTextures(1, &t.texture)
+	gl.DeleteVertexArrays(1, &t.vao)
+	gl.DeleteBuffers(1, &t.vbo)
 }

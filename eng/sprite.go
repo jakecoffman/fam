@@ -15,8 +15,9 @@ type SpriteRenderer struct {
 }
 
 type spriteInstance struct {
-	model mgl32.Mat4
-	color mgl32.Vec3
+	model  mgl32.Mat4
+	color  mgl32.Vec3
+	uvRect mgl32.Vec4
 }
 
 type spriteBatch struct {
@@ -25,7 +26,7 @@ type spriteBatch struct {
 	count   int
 }
 
-const spriteInstanceSize = (16 + 3) * 4
+const spriteInstanceSize = (16 + 3 + 4) * 4
 
 func NewSpriteRenderer(shader *Shader) *SpriteRenderer {
 	renderer := &SpriteRenderer{shader: shader}
@@ -48,10 +49,10 @@ func (s *SpriteRenderer) DrawSprite(texture *Texture2D, position, size mgl32.Vec
 	model = model.Mul4(mgl32.Translate3D(-0.5*size.X(), -0.5*size.Y(), 0))
 	model = model.Mul4(mgl32.Scale3D(size.X(), size.Y(), 1))
 
-	if len(s.batches) == 0 || s.batches[len(s.batches)-1].texture != texture {
+	if len(s.batches) == 0 || s.batches[len(s.batches)-1].texture.ID != texture.ID {
 		s.batches = append(s.batches, spriteBatch{texture: texture, start: len(s.instances)})
 	}
-	s.instances = append(s.instances, spriteInstance{model: model, color: color})
+	s.instances = append(s.instances, spriteInstance{model: model, color: color, uvRect: texture.uvRect})
 	s.batches[len(s.batches)-1].count++
 }
 
@@ -70,6 +71,7 @@ func (s *SpriteRenderer) Flush() {
 			gl.VertexAttribPointer(uint32(1+column), 4, gl.FLOAT, false, spriteInstanceSize, gl.PtrOffset(offset+column*16))
 		}
 		gl.VertexAttribPointer(5, 3, gl.FLOAT, false, spriteInstanceSize, gl.PtrOffset(offset+64))
+		gl.VertexAttribPointer(6, 4, gl.FLOAT, false, spriteInstanceSize, gl.PtrOffset(offset+76))
 		batch.texture.Bind()
 		gl.DrawArraysInstanced(gl.TRIANGLES, 0, 6, int32(batch.count))
 	}
@@ -100,7 +102,7 @@ func (s *SpriteRenderer) initRenderData() {
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 4, gl.FLOAT, false, 4*4, gl.PtrOffset(0))
 	gl.GenBuffers(1, &s.instanceVBO)
-	for attribute := uint32(1); attribute <= 5; attribute++ {
+	for attribute := uint32(1); attribute <= 6; attribute++ {
 		gl.EnableVertexAttribArray(attribute)
 		gl.VertexAttribDivisor(attribute, 1)
 	}

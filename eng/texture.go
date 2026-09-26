@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 type Texture2D struct {
@@ -19,6 +20,7 @@ type Texture2D struct {
 	ImageFormat    uint32
 
 	WrapS, WrapT, FilterMin, FilterMax int32
+	uvRect                             mgl32.Vec4
 }
 
 func NewTexture() *Texture2D {
@@ -32,6 +34,7 @@ func NewTexture() *Texture2D {
 		WrapT:          gl.REPEAT,
 		FilterMin:      gl.LINEAR,
 		FilterMax:      gl.LINEAR,
+		uvRect:         mgl32.Vec4{0, 0, 1, 1},
 	}
 }
 
@@ -43,8 +46,15 @@ func (t *Texture2D) Generate(reader io.ReadCloser) {
 		return
 	}
 
-	rgba := image.NewRGBA(img.Bounds())
-	draw.Draw(rgba, rgba.Bounds(), img, image.Pt(0, 0), draw.Src)
+	t.generateImage(img)
+}
+
+func (t *Texture2D) generateImage(img image.Image) {
+	rgba, ok := img.(*image.RGBA)
+	if !ok || rgba.Bounds().Min != (image.Point{}) || rgba.Stride != rgba.Bounds().Dx()*4 {
+		rgba = image.NewRGBA(image.Rectangle{Max: img.Bounds().Size()})
+		draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Src)
+	}
 	size := rgba.Rect.Size()
 	t.Width = size.X
 	t.Height = size.Y

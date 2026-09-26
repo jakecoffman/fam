@@ -8,8 +8,9 @@ import (
 )
 
 type Banana struct {
-	Game    *Game
-	Texture *eng.Texture2D
+	Game     *Game
+	Texture  *eng.Texture2D
+	consumed bool
 
 	*eng.Object
 }
@@ -58,31 +59,28 @@ func BananaPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 
 	a, b := arb.Shapes()
 	banana := a.UserData.(*Banana)
+	if banana.consumed {
+		return false
+	}
 
 	switch b.UserData.(type) {
 	case *Player:
 		player := b.UserData.(*Player)
+		banana.consumed = true
+		game.bananasConsumed = true
 
 		// max size reached
 		if player.Circle.Radius() < playerRadius*5 {
 			player.Circle.SetRadius(player.Circle.Radius() * 1.1)
 		}
 
+		// consumed deduplicates callbacks without cp's linear key lookup.
 		space.AddPostStepCallback(func(s *cp.Space, a interface{}, b interface{}) {
-			if banana.Shape == nil {
-				return
-			}
 			banana.Shape.UserData = nil
 			s.RemoveShape(banana.Shape)
 			s.RemoveBody(banana.Body)
 			banana.Shape = nil
 			banana.Body = nil
-			for i := 0; i < len(game.Bananas); i++ {
-				if game.Bananas[i] == banana {
-					game.Bananas = append(game.Bananas[:i], game.Bananas[i+1:]...)
-					return
-				}
-			}
 		}, nil, nil)
 
 		return false

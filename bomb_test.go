@@ -28,6 +28,28 @@ func TestBombTransitions(t *testing.T) {
 	bomb.Update(g, 1)
 }
 
+func TestExpiredBombsClearBackingSlice(t *testing.T) {
+	g := newTestGame()
+	first := NewBomb(cp.Vector{X: 100, Y: 100}, 20, g.Space)
+	live := NewBomb(cp.Vector{X: 300, Y: 100}, 20, g.Space)
+	last := NewBomb(cp.Vector{X: 500, Y: 100}, 20, g.Space)
+	first.time, last.time = 6, 6
+	g.Bombs = []*Bomb{first, live, last}
+	backing := g.Bombs
+	g.Update(eng.PhysicsDt)
+	if len(g.Bombs) != 1 || g.Bombs[0] != live {
+		t.Fatal("bomb compaction did not preserve live bombs")
+	}
+	if backing[1] != nil || backing[2] != nil {
+		t.Error("discarded slice slots still retain expired bombs")
+	}
+	live.time = 6
+	g.Update(eng.PhysicsDt)
+	if len(g.Bombs) != 0 || backing[0] != nil {
+		t.Error("last expired bomb remains referenced")
+	}
+}
+
 func TestOnlyExplodingBombDeflatesPlayers(t *testing.T) {
 	for _, test := range []struct {
 		name   string

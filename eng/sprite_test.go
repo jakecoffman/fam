@@ -46,3 +46,26 @@ func TestSpriteBatchManyPlayers(t *testing.T) {
 		t.Fatal("same-texture sprites did not combine into one instanced draw batch")
 	}
 }
+
+func TestSpriteAtlasBatchPreservesRegionsAndOrder(t *testing.T) {
+	renderer := &SpriteRenderer{}
+	a := &Texture2D{ID: 1, uvRect: mgl32.Vec4{0, 0, 0.3, 1}}
+	b := &Texture2D{ID: 1, uvRect: mgl32.Vec4{0.3, 0, 0.6, 1}}
+	c := &Texture2D{ID: 1, uvRect: mgl32.Vec4{0.6, 0, 1, 1}}
+	textures := []*Texture2D{a, b, c, b, a}
+	for i, texture := range textures {
+		renderer.DrawSprite(texture, mgl32.Vec2{float32(i), 0}, mgl32.Vec2{10, 10}, 0, White)
+	}
+	if len(renderer.batches) != 1 || renderer.batches[0].count != len(textures) {
+		t.Fatal("atlas regions did not combine into one draw batch")
+	}
+	for i, texture := range textures {
+		if renderer.instances[i].uvRect != texture.uvRect {
+			t.Errorf("sprite %d has the wrong atlas region", i)
+		}
+		center := renderer.instances[i].model.Mul4x1(mgl32.Vec4{0.5, 0.5, 0, 1})
+		if center.X() != float32(i) {
+			t.Errorf("sprite %d changed draw order or position", i)
+		}
+	}
+}

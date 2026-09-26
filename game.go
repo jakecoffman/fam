@@ -2,7 +2,6 @@ package fam
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -71,10 +70,11 @@ type Game struct {
 
 	Space *cp.Space
 
-	Players []*Player
-	Bananas []*Banana
-	Bombs   []*Bomb
-	Walls   []*Wall
+	Players         []*Player
+	Bananas         []*Banana
+	Bombs           []*Bomb
+	Walls           []*Wall
+	bananasConsumed bool
 
 	*eng.ResourceManager
 
@@ -131,6 +131,7 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.TextRenderer = eng.NewTextRenderer(g.Shader("text"), float32(openGlWindow.Width), float32(openGlWindow.Height), "assets/fonts/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
 
+	fruitFiles := make(map[string]string)
 	// Load all textures by name
 	_ = filepath.Walk("assets/textures", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -140,9 +141,16 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 			return nil
 		}
 		log.Println("Loading", info.Name())
-		g.LoadTexture(fmt.Sprintf("assets/textures/%v", info.Name()), strings.TrimSuffix(info.Name(), filepath.Ext(info.Name())))
+		name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
+		switch name {
+		case "banana", "blueberry", "strawberry":
+			fruitFiles[name] = path
+		default:
+			g.LoadTexture(path, name)
+		}
 		return nil
 	})
+	g.LoadTextureAtlas(fruitFiles)
 
 	g.ParticleGenerator = eng.NewParticleGenerator(g.Shader("particle"), g.Texture("particle"), 500)
 
@@ -352,6 +360,7 @@ func (g *Game) Update(dt float64) {
 			out = append(out, b)
 		}
 	}
+	clear(g.Bombs[len(out):])
 	g.Bombs = out
 	for i := range g.Bananas {
 		g.Bananas[i].Update(g, dt)
@@ -361,6 +370,22 @@ func (g *Game) Update(dt float64) {
 	}
 
 	g.Space.Step(dt)
+	g.compactBananas()
+}
+
+func (g *Game) compactBananas() {
+	if !g.bananasConsumed {
+		return
+	}
+	out := g.Bananas[:0]
+	for _, banana := range g.Bananas {
+		if !banana.consumed {
+			out = append(out, banana)
+		}
+	}
+	clear(g.Bananas[len(out):])
+	g.Bananas = out
+	g.bananasConsumed = false
 }
 
 func (g *Game) Render(alpha float64) {
@@ -423,6 +448,7 @@ func (g *Game) Close() {
 	g.SpriteRenderer.Destroy()
 	g.CPRenderer.Destroy()
 	g.WallRenderer.Destroy()
+	g.TextRenderer.Destroy()
 	g.Clear()
 }
 
@@ -470,6 +496,7 @@ func (g *Game) reset() {
 	}
 	g.Players = players
 	g.Bananas = []*Banana{}
+	g.bananasConsumed = false
 	g.Bombs = []*Bomb{}
 }
 
