@@ -45,6 +45,10 @@ The debug build enables physics assertions. Sprite draws are queued until
 layering. Static platform geometry is cached until a platform is added, removed,
 or a level is loaded.
 
+With Vsync enabled, macOS uses a display-refresh callback to pace frames instead
+of relying on uneven OpenGL buffer-swap timing. Windows and Linux continue to use
+GLFW's swap interval. The Vsync checkbox controls pacing on all platforms.
+
 ## screenshot
 
 ![Screenshot1](/ss01.png?raw=true "Screenshot 1")

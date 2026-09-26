@@ -11,6 +11,7 @@ type OpenGlWindow struct {
 	ViewportWidth, ViewPortHeight int
 
 	UpdateViewport bool
+	pacer          framePacer
 }
 
 const (
@@ -63,11 +64,17 @@ func (w *OpenGlWindow) Resize() {
 	w.UpdateViewport = true
 }
 
-// SetVsync enables or disables vertical synchronisation via GLFW swap interval.
+// SetVsync enables display-paced rendering.
 func (w *OpenGlWindow) SetVsync(enabled bool) {
-	if enabled {
-		glfw.SwapInterval(1)
-	} else {
-		glfw.SwapInterval(0)
-	}
+	w.pacer.setEnabled(w.Window, enabled)
+}
+
+// WaitForFrame returns false when the display is not producing refresh events.
+func (w *OpenGlWindow) WaitForFrame() bool {
+	return w.pacer.wait()
+}
+
+func (w *OpenGlWindow) Destroy() {
+	w.pacer.close()
+	w.Window.Destroy()
 }

@@ -1,10 +1,51 @@
 package eng
 
 import (
+	"math"
 	"testing"
 
 	"github.com/jakecoffman/cp/v2"
 )
+
+func TestObjectInterpolationAcrossFrameRates(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		frames []float64
+	}{
+		{"60Hz", []float64{1.0 / 60}},
+		{"120Hz", []float64{1.0 / 120}},
+		{"144Hz", []float64{1.0 / 144}},
+		{"uneven", []float64{0.014, 0.002, 0.009}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			space := cp.NewSpace()
+			body := space.AddBody(cp.NewBody(1, 1))
+			shape := space.AddShape(cp.NewCircle(body, 5, cp.Vector{}))
+			body.SetVelocity(200, 0)
+			body.SetAngularVelocity(4)
+			obj := &Object{Body: body, Shape: shape}
+			elapsed, accumulator := 0.0, 0.0
+			for frame := range 240 {
+				delta := test.frames[frame%len(test.frames)]
+				elapsed += delta
+				accumulator += delta
+				for accumulator >= PhysicsDt {
+					obj.Update(space, PhysicsDt, 10000, 10000)
+					space.Step(PhysicsDt)
+					accumulator -= PhysicsDt
+				}
+				alpha := accumulator / PhysicsDt
+				renderTime := math.Max(0, elapsed-PhysicsDt)
+				if got, want := float64(obj.SmoothPos(alpha).X()), 200*renderTime; math.Abs(got-want) > 0.0001 {
+					t.Fatalf("frame %d position = %v, want %v", frame, got, want)
+				}
+				if got, want := obj.SmoothAngle(alpha), 4*renderTime; math.Abs(got-want) > 1e-9 {
+					t.Fatalf("frame %d angle = %v, want %v", frame, got, want)
+				}
+			}
+		})
+	}
+}
 
 func TestObjectUpdateWrap(t *testing.T) {
 	tests := []struct {

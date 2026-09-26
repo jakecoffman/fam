@@ -41,7 +41,7 @@ func Run(scene Scene) {
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
-	glfw.SwapInterval(1)
+	window.SetVsync(true)
 
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -49,16 +49,19 @@ func Run(scene Scene) {
 	const dt = PhysicsDt
 	const maxAccumulator = dt * 5
 
-	currentTime := glfw.GetTime()
-	accumulator := 0.0
-
-	frames := 0
-	lastFps := glfw.GetTime()
-
 	scene.New(window)
 	defer scene.Close()
 
+	currentTime := glfw.GetTime()
+	accumulator := 0.0
+	frames := 0
+	lastFps := currentTime
+
 	for !window.ShouldClose() {
+		if !window.WaitForFrame() {
+			glfw.PollEvents()
+			continue
+		}
 		frames++
 		glfw.PollEvents()
 

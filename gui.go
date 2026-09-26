@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/inkyblackness/imgui-go"
 	"github.com/jakecoffman/fam/gui"
 	"github.com/sqweek/dialog"
@@ -156,11 +155,7 @@ func (gui *Gui) Render() {
 		imgui.Checkbox("Random Bombs", &gui.game.randomBombMode)
 		imgui.Checkbox("Render Physics", &gui.game.shouldRenderCp)
 		if imgui.Checkbox("Vsync", &gui.game.vsync) {
-			if gui.game.vsync {
-				glfw.SwapInterval(1)
-			} else {
-				glfw.SwapInterval(0)
-			}
+			gui.game.window.SetVsync(gui.game.vsync)
 		}
 
 		if imgui.ButtonV("Quit", imgui.Vec2{200, 20}) {
