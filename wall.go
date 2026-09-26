@@ -34,6 +34,6 @@ func WallPreSolve(arb *cp.Arbiter, space *cp.Space, data interface{}) bool {
 	return true
 }
 
-func (w *Wall) Draw(g *Game, alpha float64) {
-	g.CPRenderer.DrawFatSegment(w.A(), w.B(), w.Radius(), eng.DefaultOutline, eng.DefaultFill)
+func (w *Wall) Draw(renderer *eng.CPRenderer) {
+	renderer.DrawFatSegment(w.A(), w.B(), w.Radius(), eng.DefaultOutline, eng.DefaultFill)
 }

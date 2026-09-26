@@ -88,13 +88,17 @@ func (board clipboard) SetText(text string) {
 	board.platform.SetClipboardText(text)
 }
 
-// Run implements the main program loop of the demo. It returns when the platform signals to stop.
-// This demo application shows some basic features of ImGui, as well as exposing the standard demo window.
+// Render advances ImGui input every frame and draws the menu while paused.
 func (gui *Gui) Render() {
 	p := gui.platform
 
 	p.NewFrame()
 	imgui.NewFrame()
+
+	if gui.game.state != statePause {
+		imgui.Render()
+		return
+	}
 
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()!
 	// You can browse its code to learn more about Dear ImGui!).

@@ -81,9 +81,11 @@ type Game struct {
 	ParticleGenerator *eng.ParticleGenerator
 	SpriteRenderer    *eng.SpriteRenderer
 	CPRenderer        *eng.CPRenderer
+	WallRenderer      *eng.CPRenderer
 	TextRenderer      *eng.TextRenderer
 
 	shouldRenderCp bool
+	wallsDirty     bool
 
 	chaseBananaMode bool
 	randomBombMode  bool
@@ -109,7 +111,6 @@ const (
 func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.vsync = true
 	g.window = openGlWindow
-	g.gui = NewGui(g)
 	g.Keys = make(map[glfw.Key]bool)
 	g.mouseBody = cp.NewKinematicBody()
 	openGlWindow.SetVsync(g.vsync)
@@ -121,12 +122,11 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	g.LoadShader("assets/shaders/cp.vs.glsl", "assets/shaders/cp.fs.glsl", "cp")
 	g.LoadShader("assets/shaders/text.vs.glsl", "assets/shaders/text.fs.glsl", "text")
 
-	center := cp.Vector{worldWidth / 2, worldHeight / 2}
-
 	g.projection = mgl32.Ortho(0, worldWidth, worldHeight, 0, -1, 1)
-	g.Shader("sprite").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
+	g.Shader("sprite").Use().SetInt("image", 0).SetMat4("projection", g.projection)
 	g.Shader("particle").Use().SetInt("sprite", 0).SetMat4("projection", g.projection)
 	g.CPRenderer = eng.NewCPRenderer(g.Shader("cp"), g.projection)
+	g.WallRenderer = eng.NewCPRenderer(g.Shader("cp"), g.projection)
 	g.SpriteRenderer = eng.NewSpriteRenderer(g.Shader("sprite"))
 	g.TextRenderer = eng.NewTextRenderer(g.Shader("text"), float32(openGlWindow.Width), float32(openGlWindow.Height), "assets/fonts/Roboto-Light.ttf", 24)
 	g.TextRenderer.SetColor(1, 1, 1, 1)
@@ -150,31 +150,13 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 
 	glfw.SetJoystickCallback(func(joy, event int) {
 		if glfw.MonitorEvent(event) == glfw.Connected {
-			if joy+1 <= len(g.Players) {
-				log.Println("Joystick reconnected", joy)
-				return
-			}
-			log.Println("Joystick connected", joy)
-			i := len(g.Players)
-			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
-			g.Players[i].Color = eng.NextColor()
-			g.Players[i].Joystick = glfw.Joystick(joy)
+			g.connectJoystick(glfw.Joystick(joy))
 		} else {
 			log.Println("Joystick disconnected", joy)
 		}
 	})
 
-	g.Players = []*Player{}
-	for i := 0; i < 16; i++ {
-		joy := glfw.Joystick(i)
-		if !glfw.JoystickPresent(joy) {
-			break
-		}
-		g.Players = append(g.Players, NewPlayer(center, playerRadius, g))
-		g.Players[i].Color = eng.NextColor()
-		g.Players[i].Joystick = joy
-	}
+	g.discoverJoysticks(glfw.JoystickPresent)
 
 	g.state = stateActive
 
@@ -184,109 +166,151 @@ func (g *Game) New(openGlWindow *eng.OpenGlWindow) {
 	})
 
 	openGlWindow.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		if key == glfw.KeyEscape && action == glfw.Press {
-			if g.state == stateActive {
-				g.pause()
-			} else {
-				g.unpause()
-			}
-		}
-		if g.Keys[glfw.KeyE] {
-			g.Bananas = append(g.Bananas, NewBanana(g, g.mouse, 20))
-		}
-		if g.Keys[glfw.KeyQ] {
-			g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
-		}
-		if g.Keys[glfw.KeyF] {
-			g.fullscreen = !g.fullscreen
-			openGlWindow.SetFullscreen(g.fullscreen)
-		}
-		if g.Keys[glfw.KeyEnter] {
-			i := len(g.Players)
-			pos := cp.Vector{center.X + rand.Float64()*10, center.Y + rand.Float64()*10}
-			g.Players = append(g.Players, NewPlayer(pos, playerRadius, g))
-			g.Players[i].Color = eng.NextColor()
-			g.Players[i].Joystick = glfw.Joystick(-1)
-		}
-		// store for continuous application
-		if action == glfw.Press {
-			g.Keys[key] = true
-		} else if action == glfw.Release {
-			delete(g.Keys, key)
-		}
+		g.handleKey(key, action)
 	})
 
 	openGlWindow.SetMouseButtonCallback(func(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
-		if g.state != stateActive {
-			return
-		}
-		// give the mouse click a little radius to make it easier to click small shapes.
-		const clickRadius = 5
-
-		if button == glfw.MouseButton1 {
-			if action == glfw.Press {
-				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
-
-				if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
-					var nearest cp.Vector
-					if info.Distance > 0 {
-						nearest = info.Point
-					} else {
-						nearest = g.mouse
-					}
-
-					body := info.Shape.Body()
-					g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
-					g.mouseJoint.SetMaxForce(50000)
-					g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 1.0/eng.PhysicsDt))
-					g.Space.AddConstraint(g.mouseJoint)
-				} else {
-					leftDown := g.mouse.Clone()
-					g.leftDown = &leftDown
-					wall := NewWall(g, *g.leftDown, g.mouse)
-					g.drawingWallShape = wall
-					g.Walls = append(g.Walls, g.drawingWallShape)
-				}
-				return
-			}
-			// mouse up
-			if g.mouseJoint != nil {
-				g.Space.RemoveConstraint(g.mouseJoint)
-				g.mouseJoint = nil
-				return
-			}
-			if g.leftDown != nil {
-				g.leftDown = nil
-			}
-			return
-		}
-
-		if button == glfw.MouseButton2 {
-			if action == glfw.Press {
-				rightDown := g.mouse.Clone()
-				g.rightDown = &rightDown
-			} else {
-				g.rightDown = nil
-
-				info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
-
-				if info.Shape != nil {
-					if segment, ok := info.Shape.Class.(*cp.Segment); ok {
-						for i, w := range g.Walls {
-							if segment == w.Segment {
-								g.Walls = append(g.Walls[:i], g.Walls[i+1:]...)
-								g.Space.AddPostStepCallback(func(space *cp.Space, key interface{}, data interface{}) {
-									space.RemoveShape(w.Shape)
-									space.RemoveBody(w.Body())
-								}, nil, nil)
-								break
-							}
-						}
-					}
-				}
-			}
-		}
+		g.handleMouseButton(button, action)
 	})
+
+	// Install ImGui last so it can chain the game's input callbacks.
+	g.gui = NewGui(g)
+}
+
+func (g *Game) addPlayer(joy glfw.Joystick) *Player {
+	pos := cp.Vector{worldWidth/2 + rand.Float64()*10, worldHeight/2 + rand.Float64()*10}
+	player := NewPlayer(pos, playerRadius, g)
+	player.Color = eng.NextColor()
+	player.Joystick = joy
+	g.Players = append(g.Players, player)
+	return player
+}
+
+func (g *Game) connectJoystick(joy glfw.Joystick) {
+	for _, player := range g.Players {
+		if player.Joystick == joy {
+			log.Println("Joystick reconnected", joy)
+			return
+		}
+	}
+	log.Println("Joystick connected", joy)
+	g.addPlayer(joy)
+}
+
+func (g *Game) discoverJoysticks(present func(glfw.Joystick) bool) {
+	for i := 0; i < 16; i++ {
+		joy := glfw.Joystick(i)
+		if present(joy) {
+			g.connectJoystick(joy)
+		}
+	}
+}
+
+func (g *Game) handleKey(key glfw.Key, action glfw.Action) {
+	if action == glfw.Press {
+		g.Keys[key] = true
+	} else if action == glfw.Release {
+		delete(g.Keys, key)
+	}
+	if action != glfw.Press {
+		return
+	}
+	if key == glfw.KeyEscape {
+		if g.state == stateActive {
+			g.pause()
+		} else {
+			g.unpause()
+		}
+		return
+	}
+	if g.state != stateActive {
+		return
+	}
+	switch key {
+	case glfw.KeyE:
+		g.Bananas = append(g.Bananas, NewBanana(g, g.mouse, 20))
+	case glfw.KeyQ:
+		g.Bombs = append(g.Bombs, NewBomb(g.mouse, 20, g.Space))
+	case glfw.KeyF:
+		g.fullscreen = !g.fullscreen
+		g.window.SetFullscreen(g.fullscreen)
+	case glfw.KeyEnter:
+		g.addPlayer(glfw.Joystick(-1))
+	}
+}
+
+func (g *Game) handleMouseButton(button glfw.MouseButton, action glfw.Action) {
+	if g.state != stateActive {
+		return
+	}
+	const clickRadius = 5
+	if button == glfw.MouseButton1 {
+		if action == glfw.Press {
+			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+			if info.Shape != nil && info.Shape.Body().Mass() < cp.INFINITY {
+				nearest := g.mouse
+				if info.Distance > 0 {
+					nearest = info.Point
+				}
+				body := info.Shape.Body()
+				g.mouseJoint = cp.NewPivotJoint2(g.mouseBody, body, cp.Vector{}, body.WorldToLocal(nearest))
+				g.mouseJoint.SetMaxForce(50000)
+				g.mouseJoint.SetErrorBias(math.Pow(1.0-0.15, 1.0/eng.PhysicsDt))
+				g.Space.AddConstraint(g.mouseJoint)
+			} else {
+				leftDown := g.mouse
+				g.leftDown = &leftDown
+				g.drawingWallShape = NewWall(g, *g.leftDown, g.mouse)
+			}
+		} else if action == glfw.Release {
+			g.finishMouseDrag()
+		}
+		return
+	}
+	if button == glfw.MouseButton2 {
+		if action == glfw.Press {
+			rightDown := g.mouse
+			g.rightDown = &rightDown
+		} else if action == glfw.Release && g.rightDown != nil {
+			g.rightDown = nil
+			info := g.Space.PointQueryNearest(g.mouse, clickRadius, NotGrabbableFilter)
+			for i, wall := range g.Walls {
+				if wall.Shape == info.Shape {
+					g.removeWall(i)
+					break
+				}
+			}
+		}
+	}
+}
+
+func (g *Game) finishMouseDrag() {
+	if g.drawingWallShape != nil && !g.leftDown.Equal(g.mouse) {
+		wall := g.drawingWallShape
+		wall.SetEndpoints(*g.leftDown, g.mouse)
+		g.Space.AddShape(wall.Shape)
+		g.Walls = append(g.Walls, wall)
+		g.wallsDirty = true
+	}
+	g.cancelMouseDrag()
+}
+
+func (g *Game) cancelMouseDrag() {
+	if g.mouseJoint != nil {
+		g.Space.RemoveConstraint(g.mouseJoint)
+		g.mouseJoint = nil
+	}
+	g.leftDown = nil
+	g.rightDown = nil
+	g.drawingWallShape = nil
+}
+
+func (g *Game) removeWall(index int) {
+	g.Space.RemoveShape(g.Walls[index].Shape)
+	copy(g.Walls[index:], g.Walls[index+1:])
+	g.Walls[len(g.Walls)-1] = nil
+	g.Walls = g.Walls[:len(g.Walls)-1]
+	g.wallsDirty = true
 }
 
 func (g *Game) Update(dt float64) {
@@ -316,9 +340,6 @@ func (g *Game) Update(dt float64) {
 
 	if g.leftDown != nil {
 		g.drawingWallShape.SetEndpoints(*g.leftDown, g.mouse)
-	} else if g.drawingWallShape != nil {
-		g.Space.AddShape(g.drawingWallShape.Shape)
-		g.drawingWallShape = nil
 	}
 
 	for i := range g.Bombs {
@@ -352,18 +373,19 @@ func (g *Game) Render(alpha float64) {
 	}
 
 	g.SpriteRenderer.DrawSprite(g.Texture("background"), mgl32.Vec2{worldWidth / 2, worldHeight / 2}, mgl32.Vec2{worldWidth, worldHeight}, 0, eng.White)
+	g.SpriteRenderer.Flush()
 
-	{
-		g.CPRenderer.Clear()
-		if g.shouldRenderCp {
-			g.CPRenderer.DrawSpace(g.Space)
-		} else {
-			for i := range g.Walls {
-				g.Walls[i].Draw(g, alpha)
-			}
-		}
-		g.CPRenderer.Flush()
+	g.CPRenderer.Clear()
+	if g.shouldRenderCp {
+		g.CPRenderer.DrawSpace(g.Space)
+	} else {
+		g.updateWallMesh()
+		g.WallRenderer.Flush()
 	}
+	if g.drawingWallShape != nil {
+		g.drawingWallShape.Draw(g.CPRenderer)
+	}
+	g.CPRenderer.Flush()
 
 	if len(g.Players) == 0 {
 		g.TextRenderer.Print("Connect controllers or press ENTER to use keyboard", float64(g.window.Width)/2.-250., float64(g.window.Height)/2., 1)
@@ -380,18 +402,32 @@ func (g *Game) Render(alpha float64) {
 	for i := range g.Players {
 		g.Players[i].Draw(g, alpha)
 	}
+	g.SpriteRenderer.Flush()
 
-	if g.state == statePause {
-		g.gui.Render()
+	g.gui.Render()
+}
+
+func (g *Game) updateWallMesh() {
+	if !g.wallsDirty {
+		return
 	}
+	g.WallRenderer.Clear()
+	for _, wall := range g.Walls {
+		wall.Draw(g.WallRenderer)
+	}
+	g.wallsDirty = false
 }
 
 func (g *Game) Close() {
 	g.gui.Destroy()
+	g.SpriteRenderer.Destroy()
+	g.CPRenderer.Destroy()
+	g.WallRenderer.Destroy()
 	g.Clear()
 }
 
 func (g *Game) pause() {
+	g.finishMouseDrag()
 	g.state = statePause
 }
 
@@ -400,6 +436,8 @@ func (g *Game) unpause() {
 }
 
 func (g *Game) reset() {
+	g.cancelMouseDrag()
+	g.Walls = nil
 	g.Space = cp.NewSpace()
 	g.Space.Iterations = 10
 	g.Space.SetGravity(cp.Vector{0, Gravity})
@@ -451,6 +489,11 @@ func (g *Game) saveLevel(filename string) {
 		log.Println(err)
 		return
 	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
 	type entry struct {
 		A, B cp.Vector
 	}
@@ -469,6 +512,11 @@ func (g *Game) loadLevel(name string) error {
 		log.Println(err)
 		return err
 	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
 	type entry struct {
 		A, B cp.Vector
 	}
@@ -478,12 +526,17 @@ func (g *Game) loadLevel(name string) error {
 		return err
 	}
 
-	g.Walls = []*Wall{}
+	g.cancelMouseDrag()
+	for _, wall := range g.Walls {
+		g.Space.RemoveShape(wall.Shape)
+	}
+	g.Walls = nil
 	for _, w := range data {
 		wall := NewWall(g, w.A, w.B)
 		g.Space.AddShape(wall.Segment.Shape)
 		g.Walls = append(g.Walls, wall)
 	}
+	g.wallsDirty = true
 
 	return nil
 }

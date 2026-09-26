@@ -14,6 +14,7 @@ type CPRenderer struct {
 
 	triangles []Triangle
 	verts     []cp.Vector // reusable scratch buffer for polygon verts
+	dirty     bool
 }
 
 func NewCPRenderer(shader *Shader, projection mgl32.Mat4) *CPRenderer {
@@ -121,6 +122,7 @@ type Triangle struct {
 }
 
 func (cpr *CPRenderer) DrawCircle(pos cp.Vector, angle, radius float64, outline, fill FColor) {
+	cpr.dirty = true
 	r := radius + 1/DrawPointLineScale
 	a := Vertex{
 		vf{float32(pos.X - r), float32(pos.Y - r)},
@@ -161,6 +163,7 @@ func (cpr *CPRenderer) DrawSegment(a, b cp.Vector, fill FColor) {
 }
 
 func (cpr *CPRenderer) DrawFatSegment(a, b cp.Vector, radius float64, outline, fill FColor) {
+	cpr.dirty = true
 	n := b.Sub(a).ReversePerp().Normalize()
 	t := n.ReversePerp()
 
@@ -218,6 +221,7 @@ func (cpr *CPRenderer) DrawFatSegment(a, b cp.Vector, radius float64, outline, f
 }
 
 func (cpr *CPRenderer) DrawPolygon(count int, verts []cp.Vector, radius float64, outline, fill FColor) {
+	cpr.dirty = true
 	type ExtrudeVerts struct {
 		offset, n cp.Vector
 	}
@@ -303,6 +307,7 @@ func (cpr *CPRenderer) DrawPolygon(count int, verts []cp.Vector, radius float64,
 }
 
 func (cpr *CPRenderer) DrawDot(size float64, pos cp.Vector, fill FColor) {
+	cpr.dirty = true
 	r := size * 0.5 / DrawPointLineScale
 	a := Vertex{vf{float32(pos.X - r), float32(pos.Y - r)}, vf{-1, -1}, fill, fill}
 	b := Vertex{vf{float32(pos.X - r), float32(pos.Y + r)}, vf{-1, 1}, fill, fill}
@@ -327,11 +332,13 @@ func (cpr *CPRenderer) Flush() {
 	if len(cpr.triangles) == 0 {
 		return
 	}
-	gl.BindBuffer(gl.ARRAY_BUFFER, cpr.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cpr.triangles)*(48*3), gl.Ptr(cpr.triangles), gl.STREAM_DRAW)
+	if cpr.dirty {
+		gl.BindBuffer(gl.ARRAY_BUFFER, cpr.vbo)
+		gl.BufferData(gl.ARRAY_BUFFER, len(cpr.triangles)*(48*3), gl.Ptr(cpr.triangles), gl.STREAM_DRAW)
+		cpr.dirty = false
+	}
 
-	gl.UseProgram(cpr.shader.ID)
-	gl.Uniform1f(gl.GetUniformLocation(cpr.shader.ID, gl.Str("u_outline_coef\x00")), DrawPointLineScale)
+	cpr.shader.Use().SetFloat("u_outline_coef", DrawPointLineScale)
 
 	gl.BindVertexArray(cpr.vao)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(cpr.triangles)*3))
@@ -340,4 +347,10 @@ func (cpr *CPRenderer) Flush() {
 
 func (cpr *CPRenderer) Clear() {
 	cpr.triangles = cpr.triangles[:0]
+	cpr.dirty = true
+}
+
+func (cpr *CPRenderer) Destroy() {
+	gl.DeleteVertexArrays(1, &cpr.vao)
+	gl.DeleteBuffers(1, &cpr.vbo)
 }

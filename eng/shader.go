@@ -9,7 +9,8 @@ import (
 )
 
 type Shader struct {
-	ID uint32
+	ID       uint32
+	uniforms map[string]int32
 }
 
 func NewShader(vertexCode, fragmentCode string) *Shader {
@@ -29,42 +30,54 @@ func (s *Shader) Use() *Shader {
 	return s
 }
 
+func (s *Shader) uniformLocation(name string) int32 {
+	if location, ok := s.uniforms[name]; ok {
+		return location
+	}
+	location := gl.GetUniformLocation(s.ID, gl.Str(name+"\x00"))
+	if s.uniforms == nil {
+		s.uniforms = make(map[string]int32)
+	}
+	s.uniforms[name] = location
+	return location
+}
+
 func (s *Shader) SetBool(name string, value bool) *Shader {
 	if value {
-		gl.Uniform1i(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), 1)
+		gl.Uniform1i(s.uniformLocation(name), 1)
 	} else {
-		gl.Uniform1i(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), 0)
+		gl.Uniform1i(s.uniformLocation(name), 0)
 	}
 	return s
 }
 
 func (s *Shader) SetInt(name string, value int) *Shader {
-	gl.Uniform1i(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), int32(value))
+	gl.Uniform1i(s.uniformLocation(name), int32(value))
 	return s
 }
 
 func (s *Shader) SetFloat(name string, value float64) *Shader {
-	gl.Uniform1f(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), float32(value))
+	gl.Uniform1f(s.uniformLocation(name), float32(value))
 	return s
 }
 
 func (s *Shader) SetVec2f(name string, value mgl32.Vec2) *Shader {
-	gl.Uniform2f(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), value.X(), value.Y())
+	gl.Uniform2f(s.uniformLocation(name), value.X(), value.Y())
 	return s
 }
 
 func (s *Shader) SetVec3f(name string, value mgl32.Vec3) *Shader {
-	gl.Uniform3f(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), value.X(), value.Y(), value.Z())
+	gl.Uniform3f(s.uniformLocation(name), value.X(), value.Y(), value.Z())
 	return s
 }
 
 func (s *Shader) SetVec4f(name string, value mgl32.Vec4) *Shader {
-	gl.Uniform4f(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), value.X(), value.Y(), value.Z(), value.W())
+	gl.Uniform4f(s.uniformLocation(name), value.X(), value.Y(), value.Z(), value.W())
 	return s
 }
 
 func (s *Shader) SetMat4(name string, value mgl32.Mat4) *Shader {
-	gl.UniformMatrix4fv(gl.GetUniformLocation(s.ID, gl.Str(name+"\x00")), 1, false, &value[0])
+	gl.UniformMatrix4fv(s.uniformLocation(name), 1, false, &value[0])
 	return s
 }
 

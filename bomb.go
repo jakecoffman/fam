@@ -21,6 +21,7 @@ type bombState int
 const (
 	bombStateOk = iota
 	bombStateBoom
+	bombStateSpent
 	bombStateGone
 )
 
@@ -33,6 +34,7 @@ func NewBomb(pos cp.Vector, radius float64, space *cp.Space) *Bomb {
 	p := &Bomb{
 		Object: &eng.Object{},
 		state:  bombStateOk,
+		radius: radius,
 	}
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	// the bomb body is smaller because of the wick, so make it a little smaller
@@ -59,12 +61,13 @@ func (p *Bomb) Update(g *Game, dt float64) {
 	}
 	p.Object.Update(g.Space, dt, worldWidth, worldHeight)
 	p.time += dt
-	if p.time > 5 && p.state != bombStateBoom {
+	if p.time > 5 && p.state == bombStateOk {
 		p.state = bombStateBoom
-		p.Circle.SetRadius(p.Circle.Radius() * explosionSizeIncrease)
+		p.Circle.SetRadius(p.radius * explosionSizeIncrease)
 	}
 	if p.time > 5.2 && p.state == bombStateBoom {
-		p.Circle.SetRadius(p.Circle.Radius() / explosionSizeIncrease)
+		p.state = bombStateSpent
+		p.Circle.SetRadius(p.radius)
 	}
 	if p.time > 6 {
 		p.state = bombStateGone
@@ -88,7 +91,7 @@ func (p *Bomb) Draw(g *Game, alpha float64) {
 			// flash of grey representing bomb ticking ala Zelda bombs
 			color = mgl32.Vec3{.5, .5, .5}
 		}
-	case bombStateBoom:
+	case bombStateBoom, bombStateSpent:
 		texture = g.Texture(bombPowTexture)
 	default:
 		return

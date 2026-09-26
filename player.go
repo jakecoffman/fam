@@ -37,6 +37,12 @@ func NewPlayer(pos cp.Vector, radius float64, g *Game) *Player {
 }
 
 func (p *Player) Reset(pos cp.Vector, radius float64, g *Game) {
+	p.Object = &eng.Object{}
+	p.remainingBoost = 0
+	p.grounded = false
+	p.lastJumpState = false
+	p.inputX = 0
+	p.jumpHeld = false
 	p.Body = cp.NewBody(1, cp.MomentForCircle(1, radius, radius, cp.Vector{0, 0}))
 	p.Body.SetVelocityUpdateFunc(playerUpdateVelocity(g, p))
 
@@ -98,9 +104,13 @@ func (p *Player) Update(g *Game, dt float64) {
 		jumpV := -math.Sqrt(2.0 * JumpHeight * Gravity)
 		p.SetVelocityVector(p.Velocity().Add(cp.Vector{0, jumpV}))
 
-		p.remainingBoost = JumpBoostHeight / jumpV
+		p.remainingBoost = JumpBoostHeight / -jumpV
 	}
-	p.remainingBoost -= dt
+	if !p.jumpHeld {
+		p.remainingBoost = 0
+	} else {
+		p.remainingBoost = math.Max(0, p.remainingBoost-dt)
+	}
 	p.lastJumpState = p.jumpHeld
 }
 
@@ -123,7 +133,7 @@ const (
 	PlayerAirAccel     = PlayerVelocity / PlayerAirAccelTime
 
 	JumpHeight      = 250.0
-	JumpBoostHeight = 955.0
+	JumpBoostHeight = 250.0 // Additional height when jump is held.
 	FallVelocity    = 900.0
 	Gravity         = 2000.0
 )
@@ -140,16 +150,15 @@ func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64,
 		groundNormal := cp.Vector{}
 		body.EachArbiter(func(arb *cp.Arbiter) {
 			n := arb.Normal()
+			if n.Y < -0.7 {
+				p.remainingBoost = 0
+			}
 			if n.Y > 0.7 && n.Y > groundNormal.Y {
 				groundNormal = n
 			}
 		})
 
 		p.grounded = groundNormal.Y > 0
-		if groundNormal.Y < 0 {
-			p.remainingBoost = 0
-		}
-
 		// Do a normal-ish update
 		boost := jumpState && p.remainingBoost > 0
 		var grav cp.Vector

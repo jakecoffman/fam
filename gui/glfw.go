@@ -115,9 +115,21 @@ func (platform *GLFW) setKeyMapping() {
 }
 
 func (platform *GLFW) installCallbacks() {
-	platform.window.SetMouseButtonCallback(platform.mouseButtonChange)
+	var previousMouse glfw.MouseButtonCallback
+	previousMouse = platform.window.SetMouseButtonCallback(func(window *glfw.Window, button glfw.MouseButton, action glfw.Action, mods glfw.ModifierKey) {
+		platform.mouseButtonChange(window, button, action, mods)
+		if previousMouse != nil {
+			previousMouse(window, button, action, mods)
+		}
+	})
 	platform.window.SetScrollCallback(platform.mouseScrollChange)
-	platform.window.SetKeyCallback(platform.keyChange)
+	var previousKey glfw.KeyCallback
+	previousKey = platform.window.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+		platform.keyChange(window, key, scancode, action, mods)
+		if previousKey != nil {
+			previousKey(window, key, scancode, action, mods)
+		}
+	})
 	platform.window.SetCharCallback(platform.charChange)
 }
 
@@ -146,6 +158,9 @@ func (platform *GLFW) mouseScrollChange(window *glfw.Window, x, y float64) {
 }
 
 func (platform *GLFW) keyChange(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if key < 0 {
+		return
+	}
 	if action == glfw.Press {
 		platform.imguiIO.KeyPress(int(key))
 	}
