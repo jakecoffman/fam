@@ -26,7 +26,7 @@ go run ./cmd/fam
 
 ## controls
 
-- Enter adds a keyboard player. A/D or the arrow keys move, and Space jumps. Hold Space to jump up to twice as high (roughly 500 units instead of 250).
+- Enter adds a keyboard player. A/D or the arrow keys move, and Space jumps. A quick tap jumps roughly 125 units; hold Space throughout the ascent to reach roughly 188 units. Releasing restores normal gravity.
 - Controllers use the left stick to move and the first button to jump. Reconnecting a controller keeps its existing player.
 - E spawns fruit and Q spawns a bomb at the mouse. E, Q, Enter, and F act once per press, not on key repeat.
 - F toggles fullscreen. Escape opens or closes the pause menu; spawning and editing are disabled while paused.

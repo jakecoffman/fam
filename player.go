@@ -17,7 +17,7 @@ type Player struct {
 
 	Joystick glfw.Joystick
 
-	remainingBoost          float64
+	boosting                bool
 	grounded, lastJumpState bool
 
 	// inputX and jumpHeld are polled once per frame in Update and consumed by
@@ -38,7 +38,7 @@ func NewPlayer(pos cp.Vector, radius float64, g *Game) *Player {
 
 func (p *Player) Reset(pos cp.Vector, radius float64, g *Game) {
 	p.Object = &eng.Object{}
-	p.remainingBoost = 0
+	p.boosting = false
 	p.grounded = false
 	p.lastJumpState = false
 	p.inputX = 0
@@ -104,12 +104,10 @@ func (p *Player) Update(g *Game, dt float64) {
 		jumpV := -math.Sqrt(2.0 * JumpHeight * Gravity)
 		p.SetVelocityVector(p.Velocity().Add(cp.Vector{0, jumpV}))
 
-		p.remainingBoost = JumpBoostHeight / -jumpV
+		p.boosting = true
 	}
 	if !p.jumpHeld {
-		p.remainingBoost = 0
-	} else {
-		p.remainingBoost = math.Max(0, p.remainingBoost-dt)
+		p.boosting = false
 	}
 	p.lastJumpState = p.jumpHeld
 }
@@ -132,8 +130,8 @@ const (
 	PlayerAirAccelTime = 0.25
 	PlayerAirAccel     = PlayerVelocity / PlayerAirAccelTime
 
-	JumpHeight      = 250.0
-	JumpBoostHeight = 250.0 // Additional height when jump is held.
+	JumpHeight      = 125.0
+	JumpBoostHeight = 62.5 // Additional height when jump is held.
 	FallVelocity    = 900.0
 	Gravity         = 2000.0
 )
@@ -151,7 +149,7 @@ func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64,
 		body.EachArbiter(func(arb *cp.Arbiter) {
 			n := arb.Normal()
 			if n.Y < -0.7 {
-				p.remainingBoost = 0
+				p.boosting = false
 			}
 			if n.Y > 0.7 && n.Y > groundNormal.Y {
 				groundNormal = n
@@ -159,13 +157,16 @@ func playerUpdateVelocity(g *Game, p *Player) func(*cp.Body, cp.Vector, float64,
 		})
 
 		p.grounded = groundNormal.Y > 0
-		// Do a normal-ish update
-		boost := jumpState && p.remainingBoost > 0
-		var grav cp.Vector
-		if !boost {
-			grav = gravity
+		p.boosting = p.boosting && jumpState && body.Velocity().Y < 0
+		grav := gravity
+		if p.boosting {
+			// At the same launch speed, height is inversely proportional to gravity.
+			grav = gravity.Mult(JumpHeight / (JumpHeight + JumpBoostHeight))
 		}
 		body.UpdateVelocity(grav, damping, dt)
+		if body.Velocity().Y >= 0 {
+			p.boosting = false
+		}
 
 		// Target horizontal speed for air/ground control
 		targetVx := PlayerVelocity * x
